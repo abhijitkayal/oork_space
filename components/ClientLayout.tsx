@@ -1,105 +1,147 @@
 'use client';
 
-import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useTheme } from 'next-themes';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import Sidebar from '@/components/Sidebar';
 import Header from '@/components/Header';
-import CoolLoader from '@/components/Loader';
 import { SpinnerFullscreen } from './ui/spinner';
+import { useAuth } from './AuthContext';
 
 interface LayoutContextType {
-      view: string;
-      setView: (view: string) => void;
+  view: string;
+  setView: (view: string) => void;
 }
 
 const LayoutContext = createContext<LayoutContextType | undefined>(undefined);
 
 export function useLayout() {
-      const context = useContext(LayoutContext);
-      if (!context) {
-            throw new Error('useLayout must be used within a ClientLayout');
-      }
-      return context;
+  const context = useContext(LayoutContext);
+  if (!context) {
+    throw new Error('useLayout must be used within a ClientLayout');
+  }
+  return context;
 }
 
 interface ClientLayoutProps {
-      children: ReactNode;
+  children: ReactNode;
 }
 
 export default function ClientLayout({ children }: ClientLayoutProps) {
-      const { resolvedTheme } = useTheme();
-      const pathname = usePathname();
-      const [mounted, setMounted] = useState(false);
-      const [view, setView] = useState('Dashboard');
-      const [isLoading, setIsLoading] = useState(false);
+  const { resolvedTheme } = useTheme();
+  const pathname = usePathname();
+  const router = useRouter();
+  const { isAuthenticated, isLoading: authLoading, checkAuth } = useAuth();
+  
+  // Use state with lazy initialization to avoid hydration mismatch
+  const [mounted, setMounted] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return true;
+    }
+    return false;
+  });
+  const [view, setView] = useState('Dashboard');
+  const [isLoading, setIsLoading] = useState(false);
 
-      useEffect(() => {
-            setMounted(true);
-      }, []);
+  // Set mounted on client
+  if (typeof window !== 'undefined' && !mounted) {
+    setMounted(true);
+  }
 
-      useEffect(() => {
-            if (mounted) {
-                  setIsLoading(true);
-                  const timer = setTimeout(() => setIsLoading(false), 1500);
-                  return () => clearTimeout(timer);
-            }
-      }, [pathname, mounted]);
+  // Check auth on mount
+  useEffect(() => {
+    if (mounted) {
+      checkAuth();
+    }
+  }, [mounted]);
 
-      if (!mounted) {
-            return null;
-      }
+  useEffect(() => {
+    if (mounted) {
+      // Use requestAnimationFrame to avoid setState in effect warning
+      const animId = requestAnimationFrame(() => {
+        setIsLoading(true);
+        const timer = setTimeout(() => setIsLoading(false), 1500);
+      });
+      return () => {
+        cancelAnimationFrame(animId);
+      };
+    }
+  }, [pathname, mounted]);
 
-      const isDark = resolvedTheme === 'dark';
+  // Show loading while checking auth
+  if (!mounted || authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#1a1625]">
+        <SpinnerFullscreen text="Loading..." />
+      </div>
+    );
+  }
 
-      // Shared pages and auth pages should not have sidebar/header
-      const isSharedPage = pathname?.startsWith('/shared');
-      const isAuthPage = pathname?.startsWith('/login') || pathname?.startsWith('/signup');
+  const isDark = resolvedTheme === 'dark';
 
-      if (isSharedPage || isAuthPage) {
-            return (
-                  <LayoutContext.Provider value={{ view, setView }}>
-                        {children}
-                  </LayoutContext.Provider>
-            );
-      }
+  // Shared pages should not have sidebar/header
+  const isSharedPage = pathname?.startsWith('/shared');
+  const isAuthPage = pathname?.startsWith('/login') || pathname?.startsWith('/signup');
 
-      return (
-            <LayoutContext.Provider value={{ view, setView }}>
-                  <div className="flex h-screen bg-background text-foreground overflow-hidden">
-                        <Sidebar view={view} setView={setView} />
+  // If not authenticated, show auth page without sidebar
+  if (!isAuthenticated && !isSharedPage && !isAuthPage) {
+    return (
+      <LayoutContext.Provider value={{ view, setView }}>
+        <div className="min-h-screen flex items-center justify-center bg-[#1a1625]">
+          {children}
+        </div>
+      </LayoutContext.Provider>
+    );
+  }
 
-                        <div className="flex-1 flex flex-col overflow-hidden">
-                              <Header />
+  // If authenticated but on auth page, redirect to dashboard
+  if (isAuthenticated && isAuthPage) {
+    if (typeof window !== 'undefined') {
+      router.push('/');
+    }
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#1a1625]">
+        <SpinnerFullscreen text="Redirecting..." />
+      </div>
+    );
+  }
 
-                              <div className={`flex-1 overflow-y-auto transition-colors duration-300 ${isDark ? 'bg-slate-950' : 'bg-teal-50'}`}>
-                                    <AnimatePresence mode="wait">
-                                          {isLoading ? (
-                                                <motion.div
-                                                      key="global-loader"
-                                                      initial={{ opacity: 0 }}
-                                                      animate={{ opacity: 1 }}
-                                                      exit={{ opacity: 0 }}
-                                                      transition={{ duration: 0.3 }}
-                                                >
-                                                      <SpinnerFullscreen />
-                                                </motion.div>
-                                          ) : (
-                                                <motion.div
-                                                      key={pathname}
-                                                      initial={{ opacity: 0, y: 10 }}
-                                                      animate={{ opacity: 1, y: 0 }}
-                                                      transition={{ duration: 0.5 }}
-                                                      className="h-full"
-                                                >
-                                                      {children}
-                                                </motion.div>
-                                          )}
-                                    </AnimatePresence>
-                              </div>
-                        </div>
-                  </div>
-            </LayoutContext.Provider>
-      );
+  return (
+    <LayoutContext.Provider value={{ view, setView }}>
+      <div className="flex h-screen bg-background text-foreground overflow-hidden">
+        <Sidebar view={view} setView={setView} />
+
+        <div className="flex-1 flex flex-col overflow-hidden">
+          <Header />
+
+          <div className={`flex-1 overflow-y-auto transition-colors duration-300 ${isDark ? 'bg-slate-950' : 'bg-teal-50'}`}>
+            <AnimatePresence mode="wait">
+              {isLoading ? (
+                <motion.div
+                  key="global-loader"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.3 }}
+                >
+                  <SpinnerFullscreen />
+                </motion.div>
+              ) : (
+                <motion.div
+                  key={pathname}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.5 }}
+                  className="h-full"
+                >
+                  {children}
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        </div>
+      </div>
+    </LayoutContext.Provider>
+  );
 }

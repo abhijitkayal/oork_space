@@ -119,6 +119,7 @@
 
 import React from "react";
 import { useTheme } from "next-themes";
+import { useRouter } from "next/navigation";
 import {
   Search,
   Mic,
@@ -126,6 +127,7 @@ import {
   Inbox,
   ChevronDown,
   Plus,
+  LogOut,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -143,9 +145,12 @@ import {
   copyToClipboard,
   shareWhatsApp,
 } from "@/lib/share";
+import { useAuth } from "./AuthContext";
 
 export default function Header() {
   const { resolvedTheme } = useTheme();
+  const router = useRouter();
+  const { logout, user } = useAuth();
   const isDark = resolvedTheme === "dark";
 
   const PAGE_ID = "123"; // 🔥 dynamic later
@@ -231,6 +236,28 @@ export default function Header() {
 
             </DropdownMenuContent>
           </DropdownMenu>
+
+          {/* 3D Logout Button */}
+          <button
+            onClick={logout}
+            className="relative px-4 py-2 rounded-xl font-semibold text-sm text-white
+              bg-gradient-to-br from-rose-500 via-pink-500 to-purple-500
+              shadow-lg shadow-pink-500/25
+              hover:shadow-xl hover:shadow-pink-500/40
+              transform hover:-translate-y-0.5 hover:scale-105
+              transition-all duration-200
+              before:absolute before:inset-0 before:rounded-xl before:bg-white/20
+              before:opacity-0 hover:before:opacity-100
+              after:absolute after:bottom-0 after:left-2 after:right-2 after:h-1
+              after:bg-black/20 after:rounded-b-lg
+              after:opacity-0 hover:after:opacity-100
+              active:translate-y-0 active:scale-95"
+          >
+            <span className="relative z-10 flex items-center gap-2">
+              <LogOut size={16} />
+              Logout
+            </span>
+          </button>
         </div>
       </div>
     </div>
