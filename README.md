@@ -1,42 +1,184 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# OoakSpace - Collaborative Workspace Platform
+
+A modern, real-time collaborative workspace platform built with Next.js, React, and Yjs.
+
+## Features
+
+### 🔐 Authentication
+- Email/password signup with OTP verification
+- Google OAuth integration
+- Forgot password & reset password flows
+- Admin bypass for `kayalabhi04@gmail.com` / `admin1234`
+- JWT-based session management
+
+### 👥 Real-time Collaboration
+- **Yjs-powered CRDTs** for conflict-free collaboration
+- Real-time table editing with multiple users
+- WebSocket server for low-latency synchronization
+- Automatic conflict resolution
+
+### 📊 Workspace Tools
+- Interactive tables with drag & drop
+- Kanban boards
+- Calendar views
+- Task management
+- File uploads
+- Formula columns
+- Charts & visualizations
+
+### 🎨 UI/UX
+- Modern, responsive design
+- Dark/light mode support
+- Intuitive navigation
+- Customizable workspaces
+- Mobile-friendly interface
 
 ## Getting Started
 
-First, run the development server:
+### Prerequisites
+- Node.js 18+
+- MongoDB instance
+- Gmail account (for email notifications)
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+### Installation
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+1. Clone the repository
+2. Install dependencies:
+   ```bash
+   npm install
+   ```
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+3. Set up environment variables:
+   ```bash
+   cp .env.example .env.local
+   ```
+   Then edit `.env.local` with your configuration:
+   ```env
+   # Database
+   MONGODB_URI="your_mongodb_connection_string"
 
-This project uses:
+   # JWT Secret
+   JWT_SECRET="your_jwt_secret_here"
 
-- Tailwind CSS v4 with a minimal design token setup in `app/globals.css` and `tailwind.config.ts`.
-- [shadcn/ui](https://ui.shadcn.com) style components under `components/ui` (for example `button`, `dropdown-menu`, and `card`) built on top of Tailwind.
-- Radix UI primitives such as `@radix-ui/react-accordion`, `@radix-ui/react-dropdown-menu`, and others used inside the shadcn-style components.
+   # Email Configuration (for OTP emails)
+   EMAIL_USER="your_email@gmail.com"
+   EMAIL_PASS="your_gmail_app_password"
 
-To generate more shadcn/ui components, adjust `components.json` and run the `shadcn` CLI as described in the official docs.
+   # NextAuth Configuration
+   NEXTAUTH_SECRET="your_nextauth_secret"
+   NEXTAUTH_URL="http://localhost:3000"
 
-## Learn More
+   # Google OAuth (optional)
+   GOOGLE_CLIENT_ID="your_google_client_id"
+   GOOGLE_CLIENT_SECRET="your_google_client_secret"
+   ```
 
-To learn more about Next.js, take a look at the following resources:
+4. Start the development server:
+   ```bash
+   npm run dev
+   ```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+5. Start the WebSocket server for real-time collaboration:
+   ```bash
+   npm run websocket
+   ```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+### Features in Detail
 
-## Deploy on Vercel
+#### Authentication
+- Secure signup with email verification OTP
+- Social login via Google
+- Password reset flows
+- Admin account with bypass verification
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+#### Real-time Collaboration
+Powered by [Yjs](https://yjs.dev/), the platform offers:
+- Conflict-free replicated data types (CRDTs)
+- Operational transforms for smooth collaboration
+- Network resilience with automatic reconnection
+- Fine-grained updates (cell-level changes)
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+#### Workspace Modules
+- **Tables**: Spreadsheet-like data management with formulas
+- **Kanban Boards**: Agile project management
+- **Calendars**: Date-based scheduling and timeline views
+- **Tasks**: To-do lists with assignments and priorities
+- **Files**: Document upload and management
+- **Automation**: Workflow automation and integrations
+
+## Architecture
+
+### Frontend
+- Next.js 13+ with App Router
+- React 18 with hooks
+- TypeScript for type safety
+- TailwindCSS for styling
+- Headless UI for accessible components
+
+### Backend
+- Node.js API routes
+- MongoDB with Mongoose ODM
+- JWT authentication
+- WebSocket server for real-time sync
+
+### Real-time Sync
+- Yjs for CRDT-based collaboration
+- WebSocket protocol for low-latency messaging
+- Room-based collaboration (one room per document)
+- Automatic conflict resolution
+
+## API Routes
+
+### Authentication
+- `POST /api/auth/signup` - User registration
+- `POST /api/auth/login` - User login
+- `POST /api/auth/forgot-password` - Password reset initiation
+- `POST /api/auth/reset-password` - Password reset completion
+- `POST /api/auth/logout` - User logout
+- `GET /api/auth/me` - Get current user
+- `GET /api/auth/[...nextauth]` - NextAuth OAuth handlers
+
+### Data Operations
+- Various RESTful API endpoints for workspace entities
+- WebSocket-based real-time updates for collaborative features
+
+## Development
+
+### Available Scripts
+- `npm run dev` - Start Next.js development server
+- `npm run build` - Build for production
+- `npm run start` - Start production server
+- `npm run lint` - Run ESLint
+- `npm run websocket` - Start WebSocket server for collaboration
+
+### Environment Variables
+See `.env.example` for required variables.
+
+## Real-time Collaboration Guide
+
+See [COLLABORATION_GUIDE.md](COLLABORATION_GUIDE.md) for detailed information on:
+- How Yjs integration works
+- WebSocket server setup
+- Adding collaboration to new components
+- Data structures and limitations
+- Troubleshooting tips
+
+## Contributing
+
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## Acknowledgments
+
+- [Yjs](https://yjs.dev/) for the CRDT framework
+- [Next.js](https://nextjs.org/) for the React framework
+- [Tailwind CSS](https://tailwindcss.com/) for styling
+- [MongoDB](https://www.mongodb.com/) for the database
+- All open-source contributors

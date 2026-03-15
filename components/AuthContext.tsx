@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from "react";
 import { useRouter, usePathname } from "next/navigation";
 
 interface User {
@@ -26,35 +26,53 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
 
-  const checkAuth = async () => {
+  const checkAuth = useCallback(async () => {
     setIsLoading(true);
     try {
       // Check for token in cookies
-      const token = document.cookie.includes("token=");
+      const token = document.cookie
+        .split('; ')
+        .find(row => row.startsWith('token='))
+        ?.split('=')[1];
       
       if (!token) {
-        setUser(null);
-        // Only redirect to login if not already on auth page
-        if (!pathname?.startsWith("/login") && !pathname?.startsWith("/signup")) {
-          router.push("/login");
+        // Only set user to null if we don't already have a user from login
+        if (user === null) {
+          setUser(null);
         }
+        // Return early - redirect will be handled in useEffect
+        return;
       } else {
         // Token exists, user is authenticated
         // For now, we'll set a placeholder user
         // In production, you'd verify the token with the backend
-        setUser({ id: "1", email: "user@example.com" });
+        // Only set from token if we don't already have a user (e.g., from login function)
+        if (user === null) {
+          setUser({ id: "1", email: "user@example.com" });
+        }
+        // If we already have a user, we assume it's more complete or equally valid
       }
     } catch (error) {
       console.error("Auth check error:", error);
-      setUser(null);
+      // Only set user to null if we don't already have a user from login
+      if (user === null) {
+        setUser(null);
+      }
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [router, user]);
 
   useEffect(() => {
     checkAuth();
-  }, [pathname]);
+  }, [pathname, checkAuth]);
+
+  // Handle redirects separately to avoid React state update errors
+  useEffect(() => {
+    if (!isLoading && !user && !pathname?.startsWith("/login") && !pathname?.startsWith("/signup")) {
+      router.push("/login");
+    }
+  }, [isLoading, user, pathname, router]);
 
   const login = (userData: User) => {
     setUser(userData);

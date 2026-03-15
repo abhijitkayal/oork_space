@@ -1,8 +1,12 @@
 import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import User from "@/lib/models/User";
-import  dbConnect  from "@/lib/dbConnect";
+import dbConnect from "@/lib/dbConnect";
 import { signToken } from "@/lib/jwt";
+
+// Hardcoded admin credentials
+const ADMIN_EMAIL = "kayalabhi04@gmail.com";
+const ADMIN_PASSWORD = "admin1234";
 
 export async function POST(req: Request) {
   try {
@@ -18,12 +22,67 @@ export async function POST(req: Request) {
       );
     }
 
-    // find user
+    // Check for admin credentials first
+    if (email.toLowerCase() === ADMIN_EMAIL.toLowerCase() && password === ADMIN_PASSWORD) {
+      // Find or create admin user
+      let user = await User.findOne({ email: ADMIN_EMAIL });
+      
+      if (!user) {
+        // Create admin user
+        const hashedPassword = await bcrypt.hash(ADMIN_PASSWORD, 12);
+        user = await User.create({
+          name: "Admin",
+          email: ADMIN_EMAIL,
+          password: hashedPassword,
+          isVerified: true,
+        });
+      } else {
+        // Update admin user to have verified status
+        if (!user.isVerified) {
+          user.isVerified = true;
+          await user.save();
+        }
+      }
+      
+      // Generate JWT
+      const token = signToken({
+        userId: user._id,
+        email: user.email,
+      });
+      
+      const response = NextResponse.json({
+        message: "Login successful",
+        user: {
+          id: user._id,
+          email: user.email,
+        },
+      });
+
+      response.cookies.set("token", token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "strict",
+        maxAge: 60 * 60 * 24 * 7,
+        path: "/",
+      });
+
+      return response;
+    }
+
+    // Normal login flow for other users
     const user = await User.findOne({ email });
 
     if (!user) {
       return NextResponse.json(
         { success: false, message: "Invalid credentials" },
+        { status: 401 }
+      );
+    }
+
+    // Check if OAuth user trying to login with password
+    if (user.isOAuth && !user.password) {
+      return NextResponse.json(
+        { success: false, message: "This account was created with Google. Please sign in with Google." },
         { status: 401 }
       );
     }
@@ -38,8 +97,8 @@ export async function POST(req: Request) {
       );
     }
 
-    // check email verification
-    if (!user.isVerified) {
+    // check email verification (skip for OAuth users)
+    if (!user.isVerified && !user.isOAuth) {
       return NextResponse.json(
         {
           success: false,
@@ -48,11 +107,13 @@ export async function POST(req: Request) {
         { status: 403 }
       );
     }
- const token = signToken({
+
+    const token = signToken({
       userId: user._id,
       email: user.email,
     });
-      const response = NextResponse.json({
+    
+    const response = NextResponse.json({
       message: "Login successful",
       user: {
         id: user._id,
@@ -62,10 +123,10 @@ export async function POST(req: Request) {
 
     // set cookie
     response.cookies.set("token", token, {
-      httpOnly: true, // can't be accessed by JS
+      httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "strict",
-      maxAge: 60 * 60 * 24 * 7, // 7 days
+      maxAge: 60 * 60 * 24 * 7,
       path: "/",
     });
 

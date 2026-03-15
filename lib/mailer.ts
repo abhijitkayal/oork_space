@@ -2,6 +2,10 @@ import nodemailer from "nodemailer";
 
 export const sendEmailOTP = async (email: string, otp: string) => {
   try {
+    // Log for debugging (in development)
+    console.log(`Attempting to send OTP email to: ${email}`);
+    console.log(`OTP: ${otp}`);
+
     // transporter
     const transporter = nodemailer.createTransport({
       service: "gmail",
@@ -43,9 +47,12 @@ export const sendEmailOTP = async (email: string, otp: string) => {
     // send email
     await transporter.sendMail(mailOptions);
 
+    console.log(`OTP email sent successfully to: ${email}`);
     return { success: true };
   } catch (error) {
-    console.error("Email error:", error);
+    console.error("Failed to send OTP email:", error);
+    console.error("Email user:", process.env.EMAIL_USER);
+    console.error("Email pass length:", process.env.EMAIL_PASS?.length);
     return { success: false };
   }
 };

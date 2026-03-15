@@ -79,12 +79,15 @@ export async function POST(req: Request) {
       path: "/",
     });
 
-    // Try to send OTP email (don't fail if email fails)
-    try {
-      await sendEmailOTP(user.email, otp);
-    } catch (emailError) {
-      console.error("Email sending failed:", emailError);
-    }
+     // Try to send OTP email (don't fail if email fails)
+     try {
+       const emailResult = await sendEmailOTP(user.email, otp);
+       if (!emailResult.success) {
+         console.error("Email sending failed: check mailer logs for details");
+       }
+     } catch (emailError) {
+       console.error("Email sending failed:", emailError);
+     }
 
     return response;
   } catch (error) {

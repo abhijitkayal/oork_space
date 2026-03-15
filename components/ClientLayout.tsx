@@ -33,7 +33,7 @@ export default function ClientLayout({ children }: ClientLayoutProps) {
   const pathname = usePathname();
   const router = useRouter();
   const { isAuthenticated, isLoading: authLoading, checkAuth } = useAuth();
-  
+   
   // Use state with lazy initialization to avoid hydration mismatch
   const [mounted, setMounted] = useState(() => {
     if (typeof window !== 'undefined') {
@@ -43,6 +43,11 @@ export default function ClientLayout({ children }: ClientLayoutProps) {
   });
   const [view, setView] = useState('Dashboard');
   const [isLoading, setIsLoading] = useState(false);
+  const [redirecting, setRedirecting] = useState(false);
+
+  // Shared pages should not have sidebar/header
+  const isSharedPage = pathname?.startsWith('/shared');
+  const isAuthPage = pathname?.startsWith('/login') || pathname?.startsWith('/signup');
 
   // Set mounted on client
   if (typeof window !== 'undefined' && !mounted) {
@@ -55,6 +60,25 @@ export default function ClientLayout({ children }: ClientLayoutProps) {
       checkAuth();
     }
   }, [mounted]);
+
+  // Handle redirect after auth check - use setTimeout to avoid synchronous setState
+  useEffect(() => {
+    if (mounted && isAuthenticated && isAuthPage) {
+      setTimeout(() => {
+        setRedirecting(true);
+        router.push('/');
+      }, 0);
+    }
+  }, [mounted, isAuthenticated, isAuthPage, router]);
+
+  // Reset redirecting state when we leave auth pages or when pathname changes
+  useEffect(() => {
+    if (!isAuthPage) {
+      setTimeout(() => {
+        setRedirecting(false);
+      }, 0);
+    }
+  }, [isAuthPage]);
 
   useEffect(() => {
     if (mounted) {
@@ -78,11 +102,16 @@ export default function ClientLayout({ children }: ClientLayoutProps) {
     );
   }
 
-  const isDark = resolvedTheme === 'dark';
+  // Show redirecting spinner
+  if (redirecting) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#1a1625]">
+        <SpinnerFullscreen text="Redirecting..." />
+      </div>
+    );
+  }
 
-  // Shared pages should not have sidebar/header
-  const isSharedPage = pathname?.startsWith('/shared');
-  const isAuthPage = pathname?.startsWith('/login') || pathname?.startsWith('/signup');
+  const isDark = resolvedTheme === 'dark';
 
   // If not authenticated, show auth page without sidebar
   if (!isAuthenticated && !isSharedPage && !isAuthPage) {
@@ -92,18 +121,6 @@ export default function ClientLayout({ children }: ClientLayoutProps) {
           {children}
         </div>
       </LayoutContext.Provider>
-    );
-  }
-
-  // If authenticated but on auth page, redirect to dashboard
-  if (isAuthenticated && isAuthPage) {
-    if (typeof window !== 'undefined') {
-      router.push('/');
-    }
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-[#1a1625]">
-        <SpinnerFullscreen text="Redirecting..." />
-      </div>
     );
   }
 

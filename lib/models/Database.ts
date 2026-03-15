@@ -25,9 +25,24 @@ const DatabaseSchema = new Schema(
     icon: { type: String, default: "📄" },
     viewType: {
       type: String,
-      enum: ["timeline", "table", "board", "gallery", "todo", "text", "heading", "bullatedlist", "numberlist","pagelink"],
+      enum: [
+        "timeline",
+        "table",
+        "board",
+        "gallery",
+        "todo",
+        "text",
+        "heading",
+        "bullatedlist",
+        "numberlist",
+        "pagelink",
+        "presentation", // ✅ new
+        "video",        // ✅ new
+        "whiteboard",   // ✅ new
+      ],
       default: "table",
     },
+    templateName: { type: String, default: "blank" }, // ✅ new
   },
   { timestamps: true }
 );

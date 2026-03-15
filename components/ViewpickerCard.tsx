@@ -929,7 +929,7 @@
 
 import { useState } from "react";
 import { useWorkspaceStore, ViewType } from "@/app/store/WorkspaceStore";
-import { Search, X } from "lucide-react";
+import { X } from "lucide-react";
 
 const OPTIONS: {
   type: ViewType;
@@ -947,10 +947,12 @@ const OPTIONS: {
   { type: "bullatedlist", title: "Bulleted List", desc: "Bulleted list content", icon: "•" },
   { type: "numberlist", title: "Numbered List", desc: "Numbered list content", icon: "1." },
   { type: "pagelink", title: "Page Link", desc: "Link to another page", icon: "🔗" },
+  { type: "presentation", title: "Presentation", desc: "Slides and decks", icon: "🎯" },
+  { type: "video", title: "Video Editing", desc: "Edit and trim videos", icon: "🎥" },
+  { type: "whiteboard", title: "Whiteboard", desc: "Sketch and collaborate", icon: "✏️" },
 ];
 
-// Template data for each view type
-const TEMPLATES = {
+const TEMPLATES: Record<string, { id: number; name: string; desc: string }[]> = {
   table: [
     { id: 1, name: "Blank Table", desc: "Start from scratch" },
     { id: 2, name: "Project Tracker", desc: "Track project status and deadlines" },
@@ -994,8 +996,22 @@ const TEMPLATES = {
     { id: 2, name: "Step by Step", desc: "Create ordered instructions" },
   ],
   pagelink: [
-    { id: 1, name: "Blank List", desc: "Start from scratch" },
-    // { id: 2, name: "Step by Step", desc: "Create ordered instructions" },
+    { id: 1, name: "Blank Link", desc: "Start from scratch" },
+  ],
+  presentation: [
+    { id: 1, name: "Blank Presentation", desc: "Start from scratch" },
+    { id: 2, name: "Business Pitch", desc: "Professional pitch deck" },
+    { id: 3, name: "Product Demo", desc: "Product showcase slides" },
+  ],
+  video: [
+    { id: 1, name: "Blank Video", desc: "Start from scratch" },
+    { id: 2, name: "Tutorial", desc: "Step-by-step tutorial" },
+    { id: 3, name: "Promotional", desc: "Marketing video" },
+  ],
+  whiteboard: [
+    { id: 1, name: "Blank Canvas", desc: "Start from scratch" },
+    { id: 2, name: "Brainstorm", desc: "Collaborative brainstorming" },
+    { id: 3, name: "Wireframe", desc: "Design wireframes" },
   ],
 };
 
@@ -1009,303 +1025,334 @@ export default function ViewPickerCard({
   isDark?: boolean;
 }) {
   const [selectedCategory, setSelectedCategory] = useState<ViewType>("table");
-  const [searchQuery, setSearchQuery] = useState("");
   const [selectedTemplate, setSelectedTemplate] = useState<number | null>(null);
+  const [creating, setCreating] = useState(false);
 
-  const { fetchDatabases } = useWorkspaceStore();
-  console.log("Selected Category:", isDark);
+  // ✅ Get both fetchDatabases AND setActiveDatabase from the store
+  const { fetchDatabases, setActiveDatabase } = useWorkspaceStore();
 
   const createDbFromTemplate = async (templateId: number) => {
-    const template = (TEMPLATES[selectedCategory] || []).find(t => t.id === templateId);
-    if (!template) return;
+    if (creating) return;
+    setCreating(true);
+
+    const template = (TEMPLATES[selectedCategory] || []).find(
+      (t) => t.id === templateId
+    );
+    if (!template) { setCreating(false); return; }
+
+    let templateName = "blank";
+    if (selectedCategory === "presentation") {
+      templateName = templateId === 1 ? "blank" : templateId === 2 ? "business" : "product";
+    } else if (selectedCategory === "video") {
+      templateName = templateId === 1 ? "blank" : templateId === 2 ? "tutorial" : "promotional";
+    } else if (selectedCategory === "whiteboard") {
+      templateName = templateId === 1 ? "blank" : templateId === 2 ? "brainstorm" : "wireframe";
+    }
 
     const payload = {
       projectId,
       name: template.name,
       icon: OPTIONS.find((o) => o.type === selectedCategory)?.icon || "📄",
       viewType: selectedCategory,
-      ...(templateId > 1 && {
-        rows: [
-          { name: "Task 1", status: "Todo", date: "2026-02-10" },
-          { name: "Task 2", status: "Doing", date: "2026-02-12" },
-          { name: "Task 3", status: "Done", date: "2026-02-15" },
-        ],
-      }),
+      templateName,
+      ...(templateId > 1 &&
+        ["table", "board", "timeline", "gallery", "todo"].includes(selectedCategory) && {
+          rows: [
+            { name: "Task 1", status: "Todo", date: "2026-02-10" },
+            { name: "Task 2", status: "Doing", date: "2026-02-12" },
+            { name: "Task 3", status: "Done", date: "2026-02-15" },
+          ],
+        }),
     };
 
-    await fetch("/api/databases", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
+    try {
+      const res = await fetch("/api/databases", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
 
-    await fetchDatabases(projectId);
-    onDone();
+      if (!res.ok) throw new Error("Failed to create database");
+
+      // ✅ Get the newly created database from the response
+      const newDb = await res.json();
+
+      // ✅ Refresh the database list in the sidebar
+      await fetchDatabases(projectId);
+
+      // ✅ Immediately open/select the newly created database
+      if (newDb?._id && setActiveDatabase) {
+        setActiveDatabase(newDb);
+      }
+
+      onDone();
+    } catch (err) {
+      console.error("Failed to create database:", err);
+    } finally {
+      setCreating(false);
+    }
   };
 
   const templates = TEMPLATES[selectedCategory] || [];
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-0 sm:p-4 md:p-6">
-      <div className={`w-full max-w-7xl h-full sm:h-[90vh] overflow-hidden sm:rounded-2xl border shadow-2xl flex flex-col ${
-        isDark ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-200'
-      }`}>
+      <div
+        className={`w-full max-w-7xl h-full sm:h-[90vh] overflow-hidden sm:rounded-2xl border shadow-2xl flex flex-col ${
+          isDark ? "bg-gray-900 border-gray-800" : "bg-white border-gray-200"
+        }`}
+      >
         {/* Header */}
-        <div className={`border-b px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between ${
-          isDark ? 'border-gray-800' : 'border-gray-200'
-        }`}>
-          <h1 className={`text-lg sm:text-2xl font-bold ${
-            isDark ? 'text-white' : 'text-gray-900'
-          }`}>Create a design</h1>
-          <button 
-            onClick={onDone} 
+        <div
+          className={`border-b px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between ${
+            isDark ? "border-gray-800" : "border-gray-200"
+          }`}
+        >
+          <h1
+            className={`text-lg sm:text-2xl font-bold ${
+              isDark ? "text-white" : "text-gray-900"
+            }`}
+          >
+            Create a design
+          </h1>
+          <button
+            onClick={onDone}
             className={`p-2 rounded-lg transition-colors ${
-              isDark ? 'hover:bg-gray-800 text-gray-400' : 'hover:bg-gray-100 text-gray-600'
-            }`} 
+              isDark
+                ? "hover:bg-gray-800 text-gray-400"
+                : "hover:bg-gray-100 text-gray-600"
+            }`}
             aria-label="Close"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Search Bar */}
-        {/* <div className="px-6 py-4 border-b">
-          <div className="relative max-w-xl">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="What would you like to create?"
-              className="w-full pl-10 pr-4 py-3 border rounded-lg outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-        </div> */}
-
         {/* Main Content */}
         <div className="flex flex-1 overflow-hidden">
-        {/* Left Sidebar */}
-        <div className={`hidden md:block w-48 lg:w-64 border-r overflow-y-auto ${
-          isDark ? 'bg-gray-800 border-gray-700' : 'bg-gray-50 border-gray-200'
-        }`}>
-  <div className="p-3 lg:p-4 space-y-4 lg:space-y-6">
-
-    {/* ===== DATASET ===== */}
-    <div>
-      <div className={`text-xs font-semibold uppercase mb-2 px-2 ${
-        isDark ? 'text-gray-400' : 'text-gray-500'
-      }`}>
-        Dataset(suggested)
-      </div>
-
-      <div className="space-y-1">
-        {OPTIONS.filter((o) =>
-          ["table", "board", "timeline", "gallery"].includes(o.type)
-        ).map((option) => (
-          <button
-            key={option.type}
-            onClick={() => setSelectedCategory(option.type)}
-            className={`w-full flex items-center gap-2 lg:gap-3 px-2 lg:px-3 py-2 lg:py-2.5 rounded-lg text-left transition ${
-              selectedCategory === option.type
-                ? isDark 
-                  ? "bg-gray-700 shadow-sm font-medium" 
-                  : "bg-white shadow-sm font-medium"
-                : isDark
-                  ? "hover:bg-gray-700"
-                  : "hover:bg-gray-100"
+          {/* Left Sidebar */}
+          <div
+            className={`hidden md:block w-48 lg:w-64 border-r overflow-y-auto ${
+              isDark
+                ? "bg-gray-800 border-gray-700"
+                : "bg-gray-50 border-gray-200"
             }`}
           >
-            <span className="text-lg lg:text-xl">{option.icon}</span>
-            <div className="flex-1 min-w-0">
-              <div className={`text-xs lg:text-sm font-medium truncate ${
-                isDark ? 'text-white' : 'text-gray-900'
-              }`}>{option.title}</div>
-              <div className={`text-[10px] lg:text-xs truncate ${
-                isDark ? 'text-gray-400' : 'text-gray-500'
-              }`}>{option.desc}</div>
-            </div>
-          </button>
-        ))}
-      </div>
-    </div>
+            <div className="p-3 lg:p-4 space-y-4 lg:space-y-6">
 
-    {/* ===== BASIC NOTES ===== */}
-    <div>
-      <div className={`text-xs font-semibold uppercase mb-2 px-2 ${
-        isDark ? 'text-gray-400' : 'text-gray-500'
-      }`}>
-        Basic Notes
-      </div>
+              {/* DATASET */}
+              <div>
+                <div className={`text-xs font-semibold uppercase mb-2 px-2 ${isDark ? "text-gray-400" : "text-gray-500"}`}>
+                  Dataset (suggested)
+                </div>
+                <div className="space-y-1">
+                  {OPTIONS.filter((o) =>
+                    ["table", "board", "timeline", "gallery"].includes(o.type)
+                  ).map((option) => (
+                    <SidebarButton
+                      key={option.type}
+                      option={option}
+                      isActive={selectedCategory === option.type}
+                      isDark={isDark}
+                      onClick={() => setSelectedCategory(option.type)}
+                    />
+                  ))}
+                </div>
+              </div>
 
-      <div className="space-y-1">
-        {OPTIONS.filter((o) =>
-          ["todo", "text", "heading", "bullatedlist", "numberlist","pagelink"].includes(o.type)
-        ).map((option) => (
-          <button
-            key={option.type}
-            onClick={() => setSelectedCategory(option.type)}
-            className={`w-full flex items-center gap-2 lg:gap-3 px-2 lg:px-3 py-2 lg:py-2.5 rounded-lg text-left transition ${
-              selectedCategory === option.type
-                ? isDark 
-                  ? "bg-gray-700 shadow-sm font-medium" 
-                  : "bg-white shadow-sm font-medium"
-                : isDark
-                  ? "hover:bg-gray-700"
-                  : "hover:bg-gray-100"
-            }`}
-          >
-            <span className="text-lg lg:text-xl">{option.icon}</span>
-            <div className="flex-1 min-w-0">
-              <div className={`text-xs lg:text-sm font-medium truncate ${
-                isDark ? 'text-white' : 'text-gray-900'
-              }`}>{option.title}</div>
-              <div className={`text-[10px] lg:text-xs truncate ${
-                isDark ? 'text-gray-400' : 'text-gray-500'
-              }`}>{option.desc}</div>
-            </div>
-          </button>
-        ))}
-      </div>
-    </div>
+              {/* MEDIA & COLLABORATION */}
+              <div>
+                <div className={`text-xs font-semibold uppercase mb-2 px-2 ${isDark ? "text-gray-400" : "text-gray-500"}`}>
+                  Media & Collaboration
+                </div>
+                <div className="space-y-1">
+                  {OPTIONS.filter((o) =>
+                    ["presentation", "video", "whiteboard"].includes(o.type)
+                  ).map((option) => (
+                    <SidebarButton
+                      key={option.type}
+                      option={option}
+                      isActive={selectedCategory === option.type}
+                      isDark={isDark}
+                      onClick={() => setSelectedCategory(option.type)}
+                    />
+                  ))}
+                </div>
+              </div>
 
-  </div>
-        </div>
+              {/* BASIC NOTES */}
+              <div>
+                <div className={`text-xs font-semibold uppercase mb-2 px-2 ${isDark ? "text-gray-400" : "text-gray-500"}`}>
+                  Basic Notes
+                </div>
+                <div className="space-y-1">
+                  {OPTIONS.filter((o) =>
+                    ["todo", "text", "heading", "bullatedlist", "numberlist", "pagelink"].includes(o.type)
+                  ).map((option) => (
+                    <SidebarButton
+                      key={option.type}
+                      option={option}
+                      isActive={selectedCategory === option.type}
+                      isDark={isDark}
+                      onClick={() => setSelectedCategory(option.type)}
+                    />
+                  ))}
+                </div>
+              </div>
 
-        {/* Right Content Area */}
-        <div className={`flex-1 overflow-y-auto ${
-          isDark ? 'bg-gray-900' : 'bg-white'
-        }`}>
-          <div className="p-4 sm:p-6 lg:p-8">
-            {/* Section Title */}
-            <div className="mb-4 sm:mb-6">
-              <h2 className={`text-lg sm:text-xl font-bold mb-2 ${
-                isDark ? 'text-white' : 'text-gray-900'
-              }`}>
-                {OPTIONS.find((o) => o.type === selectedCategory)?.title} templates
-              </h2>
-              <p className={`text-xs sm:text-sm ${
-                isDark ? 'text-gray-400' : 'text-gray-600'
-              }`}>
-                {OPTIONS.find((o) => o.type === selectedCategory)?.desc}
-              </p>
-            </div>
-
-            {/* Templates Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-6">
-              {templates.map((template) => (
-                <button
-                  key={template.id}
-                  onClick={() => createDbFromTemplate(template.id)}
-                  onMouseEnter={() => setSelectedTemplate(template.id)}
-                  onMouseLeave={() => setSelectedTemplate(null)}
-                  className={`group relative aspect-video sm:aspect-4/3 rounded-xl border-2 overflow-hidden transition-all hover:shadow-lg ${
-                    isDark 
-                      ? 'border-gray-700 hover:border-teal-500' 
-                      : 'border-gray-200 hover:border-blue-500'
-                  }`}
-                >
-                  {/* Preview Area */}
-                  <div className={`absolute inset-0 p-3 sm:p-4 ${
-                    isDark 
-                      ? 'bg-gradient-to-br from-gray-800 to-gray-900' 
-                      : 'bg-gradient-to-br from-gray-50 to-gray-100'
-                  }`}>
-                    <div className="h-full flex items-center justify-center">
-                      {selectedCategory === "table" && (
-                        <TableTemplatePreview templateId={template.id} />
-                      )}
-                      {selectedCategory === "board" && (
-                        <BoardTemplatePreview templateId={template.id} />
-                      )}
-                      {selectedCategory === "timeline" && (
-                        <TimelineTemplatePreview templateId={template.id} />
-                      )}
-                      {selectedCategory === "gallery" && (
-                        <GalleryTemplatePreview templateId={template.id} />
-                      )}
-                      {selectedCategory === "todo" && (
-                        <TodoTemplatePreview templateId={template.id} />
-                      )}
-                      {(selectedCategory === "text" ||
-                        selectedCategory === "heading" ||
-                        selectedCategory === "bullatedlist" ||
-                        selectedCategory === "numberlist") && (
-                        <GenericTemplatePreview type={selectedCategory} />
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Template Info */}
-                  <div className={`absolute bottom-0 left-0 right-0 backdrop-blur-sm p-3 sm:p-4 border-t ${
-                    isDark 
-                      ? 'bg-gray-800/95 border-gray-700' 
-                      : 'bg-white/95 border-gray-200'
-                  }`}>
-                    <h3 className={`font-semibold text-xs sm:text-sm ${
-                      isDark ? 'text-white' : 'text-gray-900'
-                    }`}>{template.name}</h3>
-                    <p className={`text-[10px] sm:text-xs mt-1 ${
-                      isDark ? 'text-gray-400' : 'text-gray-600'
-                    }`}>{template.desc}</p>
-                  </div>
-
-                  {/* Hover Overlay */}
-                  {selectedTemplate === template.id && (
-                    <div className={`absolute inset-0 flex items-center justify-center ${
-                      isDark ? 'bg-teal-500/10' : 'bg-blue-500/10'
-                    }`}>
-                      <div className={`px-4 py-2 rounded-lg font-medium text-white ${
-                        isDark ? 'bg-teal-500' : 'bg-blue-500'
-                      }`}>
-                        Create
-                      </div>
-                    </div>
-                  )}
-                </button>
-              ))}
             </div>
           </div>
-        </div>
+
+          {/* Right Content */}
+          <div className={`flex-1 overflow-y-auto ${isDark ? "bg-gray-900" : "bg-white"}`}>
+            <div className="p-4 sm:p-6 lg:p-8">
+              <div className="mb-4 sm:mb-6">
+                <h2 className={`text-lg sm:text-xl font-bold mb-1 ${isDark ? "text-white" : "text-gray-900"}`}>
+                  {OPTIONS.find((o) => o.type === selectedCategory)?.title} templates
+                </h2>
+                <p className={`text-xs sm:text-sm ${isDark ? "text-gray-400" : "text-gray-600"}`}>
+                  {OPTIONS.find((o) => o.type === selectedCategory)?.desc}
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-6">
+                {templates.map((template) => (
+                  <button
+                    key={template.id}
+                    onClick={() => createDbFromTemplate(template.id)}
+                    onMouseEnter={() => setSelectedTemplate(template.id)}
+                    onMouseLeave={() => setSelectedTemplate(null)}
+                    disabled={creating}
+                    className={`group relative rounded-xl border-2 overflow-hidden transition-all hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed ${
+                      isDark
+                        ? "border-gray-700 hover:border-teal-500"
+                        : "border-gray-200 hover:border-blue-500"
+                    }`}
+                    style={{ aspectRatio: "4/3" }}
+                  >
+                    {/* Preview */}
+                    <div
+                      className={`absolute inset-0 p-3 sm:p-4 ${
+                        isDark
+                          ? "bg-gradient-to-br from-gray-800 to-gray-900"
+                          : "bg-gradient-to-br from-gray-50 to-gray-100"
+                      }`}
+                    >
+                      <div className="h-full flex items-center justify-center">
+                        {selectedCategory === "table" && <TableTemplatePreview templateId={template.id} />}
+                        {selectedCategory === "board" && <BoardTemplatePreview templateId={template.id} />}
+                        {selectedCategory === "timeline" && <TimelineTemplatePreview templateId={template.id} />}
+                        {selectedCategory === "gallery" && <GalleryTemplatePreview templateId={template.id} />}
+                        {selectedCategory === "todo" && <TodoTemplatePreview templateId={template.id} />}
+                        {["text", "heading", "bullatedlist", "numberlist"].includes(selectedCategory) && (
+                          <GenericTemplatePreview type={selectedCategory} />
+                        )}
+                        {selectedCategory === "presentation" && <PresentationTemplatePreview templateId={template.id} />}
+                        {selectedCategory === "video" && <VideoTemplatePreview templateId={template.id} />}
+                        {selectedCategory === "whiteboard" && <WhiteboardTemplatePreview templateId={template.id} />}
+                        {selectedCategory === "pagelink" && <GenericTemplatePreview type="pagelink" />}
+                      </div>
+                    </div>
+
+                    {/* Info */}
+                    <div
+                      className={`absolute bottom-0 left-0 right-0 backdrop-blur-sm p-3 sm:p-4 border-t ${
+                        isDark
+                          ? "bg-gray-800/95 border-gray-700"
+                          : "bg-white/95 border-gray-200"
+                      }`}
+                    >
+                      <h3 className={`font-semibold text-xs sm:text-sm ${isDark ? "text-white" : "text-gray-900"}`}>
+                        {template.name}
+                      </h3>
+                      <p className={`text-[10px] sm:text-xs mt-0.5 ${isDark ? "text-gray-400" : "text-gray-600"}`}>
+                        {template.desc}
+                      </p>
+                    </div>
+
+                    {/* Hover overlay */}
+                    {selectedTemplate === template.id && !creating && (
+                      <div className={`absolute inset-0 flex items-center justify-center ${isDark ? "bg-teal-500/10" : "bg-blue-500/10"}`}>
+                        <div className={`px-4 py-2 rounded-lg font-medium text-white text-sm ${isDark ? "bg-teal-500" : "bg-blue-500"}`}>
+                          Create
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Creating spinner overlay */}
+                    {creating && selectedTemplate === template.id && (
+                      <div className="absolute inset-0 flex items-center justify-center bg-black/30">
+                        <div className="w-6 h-6 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      </div>
+                    )}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
   );
 }
 
-/* -------- TEMPLATE PREVIEW COMPONENTS -------- */
-
-function TableTemplatePreview({ templateId }: { templateId: number }) {
-  if (templateId === 1) {
-    return (
-      <div className="w-full bg-white rounded-lg p-3 text-[10px]">
-        <div className="grid grid-cols-3 gap-2 font-semibold text-gray-700">
-          <div>Name</div>
-          <div>Status</div>
-          <div>Date</div>
+/* ── Sidebar Button ── */
+function SidebarButton({
+  option,
+  isActive,
+  isDark,
+  onClick,
+}: {
+  option: { type: string; title: string; desc: string; icon: string };
+  isActive: boolean;
+  isDark?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={`w-full flex items-center gap-2 lg:gap-3 px-2 lg:px-3 py-2 lg:py-2.5 rounded-lg text-left transition ${
+        isActive
+          ? isDark
+            ? "bg-gray-700 shadow-sm font-medium"
+            : "bg-white shadow-sm font-medium"
+          : isDark
+          ? "hover:bg-gray-700"
+          : "hover:bg-gray-100"
+      }`}
+    >
+      <span className="text-lg lg:text-xl">{option.icon}</span>
+      <div className="flex-1 min-w-0">
+        <div className={`text-xs lg:text-sm font-medium truncate ${isDark ? "text-white" : "text-gray-900"}`}>
+          {option.title}
         </div>
-        <div className="mt-2 space-y-1">
-          <div className="h-5 bg-gray-100 rounded" />
-          <div className="h-5 bg-gray-100 rounded" />
+        <div className={`text-[10px] lg:text-xs truncate ${isDark ? "text-gray-400" : "text-gray-500"}`}>
+          {option.desc}
         </div>
       </div>
-    );
-  }
-  
+    </button>
+  );
+}
+
+/* ── Template Previews ── */
+function TableTemplatePreview({ templateId }: { templateId: number }) {
   return (
     <div className="w-full bg-white rounded-lg p-3 text-[10px]">
       <div className="grid grid-cols-3 gap-2 font-semibold text-gray-700">
-        <div>Task</div>
-        <div>Status</div>
-        <div>Due</div>
+        <div>Name</div><div>Status</div><div>Date</div>
       </div>
       <div className="mt-2 space-y-1">
-        {[1, 2, 3].map((i) => (
-          <div key={i} className="grid grid-cols-3 gap-2">
-            <div>Task {i}</div>
-            <div className="text-green-600">●</div>
-            <div>Feb {10 + i}</div>
-          </div>
-        ))}
+        {templateId === 1 ? (
+          <><div className="h-5 bg-gray-100 rounded" /><div className="h-5 bg-gray-100 rounded" /></>
+        ) : (
+          [1, 2, 3].map((i) => (
+            <div key={i} className="grid grid-cols-3 gap-2">
+              <div>Task {i}</div>
+              <div className="text-green-600">●</div>
+              <div>Feb {10 + i}</div>
+            </div>
+          ))
+        )}
       </div>
     </div>
   );
@@ -1321,14 +1368,7 @@ function BoardTemplatePreview({ templateId }: { templateId: number }) {
             {templateId === 1 ? (
               <div className="h-6 bg-gray-100 rounded" />
             ) : (
-              <>
-                <div className="h-6 bg-blue-100 rounded flex items-center px-1 text-[8px]">
-                  Task {col[0]}
-                </div>
-                <div className="h-6 bg-purple-100 rounded flex items-center px-1 text-[8px]">
-                  Task {col[1]}
-                </div>
-              </>
+              <><div className="h-6 bg-blue-100 rounded" /><div className="h-6 bg-purple-100 rounded" /></>
             )}
           </div>
         </div>
@@ -1340,19 +1380,13 @@ function BoardTemplatePreview({ templateId }: { templateId: number }) {
 function TimelineTemplatePreview({ templateId }: { templateId: number }) {
   return (
     <div className="w-full bg-white rounded-lg p-3">
-      <div className="text-[9px] text-gray-500 mb-2">
-        {templateId === 1 ? "Empty timeline" : "Feb 2026"}
-      </div>
+      <div className="text-[9px] text-gray-500 mb-2">{templateId === 1 ? "Empty timeline" : "Feb 2026"}</div>
       <div className="relative h-16">
         <div className="absolute top-0 bottom-0 left-1/2 w-0.5 bg-red-300" />
         {templateId > 1 && (
           <>
-            <div className="absolute top-1 left-2 right-1/2 h-5 bg-blue-200 rounded-sm text-[8px] flex items-center px-1">
-              Task 1
-            </div>
-            <div className="absolute top-7 left-8 right-1/3 h-5 bg-green-200 rounded-sm text-[8px] flex items-center px-1">
-              Task 2
-            </div>
+            <div className="absolute top-1 left-2 right-1/2 h-5 bg-blue-200 rounded-sm text-[8px] flex items-center px-1">Task 1</div>
+            <div className="absolute top-7 left-8 right-1/3 h-5 bg-green-200 rounded-sm text-[8px] flex items-center px-1">Task 2</div>
           </>
         )}
       </div>
@@ -1365,10 +1399,8 @@ function GalleryTemplatePreview({ templateId }: { templateId: number }) {
     <div className="w-full grid grid-cols-3 gap-2">
       {[1, 2, 3].map((i) => (
         <div key={i} className="rounded-md bg-white overflow-hidden">
-          <div className={`h-12 ${templateId === 1 ? "bg-gray-100" : "bg-linear-to-br from-blue-100 to-purple-100"}`} />
-          <div className="p-1 text-[8px] font-semibold">
-            {templateId === 1 ? "" : `Item ${i}`}
-          </div>
+          <div className={`h-12 ${templateId === 1 ? "bg-gray-100" : "bg-gradient-to-br from-blue-100 to-purple-100"}`} />
+          <div className="p-1 text-[8px] font-semibold">{templateId === 1 ? "" : `Item ${i}`}</div>
         </div>
       ))}
     </div>
@@ -1382,9 +1414,7 @@ function TodoTemplatePreview({ templateId }: { templateId: number }) {
         {[1, 2, 3].map((i) => (
           <div key={i} className="flex items-center gap-2 text-[10px]">
             <div className="w-3 h-3 rounded border-2 border-gray-300" />
-            <div className="text-gray-700">
-              {templateId === 1 ? `Task ${i}` : `Daily task ${i}`}
-            </div>
+            <div className="text-gray-700">{templateId === 1 ? `Task ${i}` : `Daily task ${i}`}</div>
           </div>
         ))}
       </div>
@@ -1393,14 +1423,69 @@ function TodoTemplatePreview({ templateId }: { templateId: number }) {
 }
 
 function GenericTemplatePreview({ type }: { type: string }) {
+  const icons: Record<string, string> = {
+    text: "📝", heading: "📌", bullatedlist: "•", numberlist: "1.", pagelink: "🔗",
+  };
   return (
     <div className="w-full bg-white rounded-lg p-4 flex items-center justify-center">
-      <div className="text-4xl">
-        {type === "text" && "📝"}
-        {type === "heading" && "📌"}
-        {type === "bullatedlist" && "•"}
-        {type === "numberlist" && "1."}
+      <div className="text-4xl">{icons[type] ?? "📄"}</div>
+    </div>
+  );
+}
+
+function PresentationTemplatePreview({ templateId }: { templateId: number }) {
+  const labels = ["Blank Slides", "Business Pitch", "Product Demo"];
+  return (
+    <div className="w-full bg-gradient-to-br from-indigo-600 to-purple-600 rounded-lg p-4 flex flex-col items-center justify-center text-white">
+      <div className="text-3xl mb-2">🎯</div>
+      <div className="text-[10px] font-semibold text-center">{labels[templateId - 1]}</div>
+      <div className="mt-2 flex gap-1">
+        <div className="w-8 h-6 bg-white/30 rounded-sm" />
+        <div className="w-8 h-6 bg-white/20 rounded-sm" />
+        <div className="w-8 h-6 bg-white/10 rounded-sm" />
       </div>
+    </div>
+  );
+}
+
+function VideoTemplatePreview({ templateId }: { templateId: number }) {
+  const labels = ["Blank Video", "Tutorial", "Promotional"];
+  return (
+    <div className="w-full bg-gray-900 rounded-lg p-4 flex flex-col items-center justify-center text-white">
+      <div className="text-3xl mb-2">🎥</div>
+      <div className="w-12 h-8 bg-gray-700 rounded-md flex items-center justify-center mb-2">
+        <span className="text-lg">▶</span>
+      </div>
+      <div className="text-[10px] font-semibold text-center">{labels[templateId - 1]}</div>
+      <div className="mt-2 w-full bg-gray-700 h-1 rounded-full">
+        <div className="bg-red-500 h-1 rounded-full" style={{ width: `${templateId * 30}%` }} />
+      </div>
+    </div>
+  );
+}
+
+function WhiteboardTemplatePreview({ templateId }: { templateId: number }) {
+  const labels = ["Blank Canvas", "Brainstorm", "Wireframe"];
+  return (
+    <div className="w-full bg-white rounded-lg p-4 flex flex-col items-center justify-center border-2 border-gray-200">
+      <div className="text-3xl mb-2">✏️</div>
+      <div className="w-full h-12 bg-gray-50 rounded-md mb-2 flex items-center justify-center">
+        {templateId === 1 && <div className="text-[10px] text-gray-400">Blank canvas</div>}
+        {templateId === 2 && (
+          <div className="flex gap-1">
+            <div className="w-2 h-2 rounded-full bg-blue-500" />
+            <div className="w-2 h-2 rounded-full bg-green-500" />
+            <div className="w-2 h-2 rounded-full bg-yellow-500" />
+          </div>
+        )}
+        {templateId === 3 && (
+          <div className="flex gap-2">
+            <div className="w-3 h-4 border-2 border-gray-400 rounded" />
+            <div className="w-3 h-4 border-2 border-gray-400 rounded" />
+          </div>
+        )}
+      </div>
+      <div className="text-[10px] font-semibold text-center">{labels[templateId - 1]}</div>
     </div>
   );
 }

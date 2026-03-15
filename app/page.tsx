@@ -2,7 +2,7 @@
 
 import { useAuth } from '@/components/AuthContext';
 import { useRouter } from 'next/navigation';
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import AppShell from '@/components/AppShell';
 import AuthModal from '@/components/AuthModal';
 
@@ -11,21 +11,22 @@ export default function Home() {
   const router = useRouter();
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [authMode, setAuthMode] = useState<'sign-in' | 'sign-up'>('sign-in');
-  const [mounted, setMounted] = useState(false);
+  const [mounted, setMounted] = useState(typeof window !== 'undefined');
 
   // Use useCallback to handle the auth check
   const checkAndShowAuth = useCallback(() => {
+    // Check if component is still mounted before setting state
     if (!isLoading && !isAuthenticated) {
       setShowAuthModal(true);
     }
   }, [isLoading, isAuthenticated]);
 
-  // Set mounted and check auth on mount
-  if (!mounted) {
-    setMounted(true);
-    // Delay the auth check slightly
-    setTimeout(checkAndShowAuth, 0);
-  }
+  // Check auth on mount
+  useEffect(() => {
+    // Delay the auth check slightly to avoid hydration issues
+    const timer = setTimeout(checkAndShowAuth, 0);
+    return () => clearTimeout(timer);
+  }, [checkAndShowAuth]);
 
   const handleCloseAuth = () => {
     setShowAuthModal(false);
@@ -35,7 +36,7 @@ export default function Home() {
   };
 
   // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-  if (!mounted || isLoading) {
+  if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#1a1625]">
         <div className="animate-pulse text-white">Loading...</div>

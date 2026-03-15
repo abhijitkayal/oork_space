@@ -1,6 +1,5 @@
-import Table from "@/components/table/Table";
-import { properties, rows } from "@/data/MockData";
+import TableView from "@/components/TableView";
 
 export default function Page() {
-  return <Table properties={properties} rows={rows} />;
+  return <TableView />;
 }
