@@ -1,16 +1,17 @@
 import { NextResponse } from "next/server";
-import { connectDB } from "@/lib/mongodb";
-import FormulaColumn from "@/models/FormulaColumn";
+import dbConnect from "@/lib/dbConnect";
+import FormulaColumn from "@/lib/models/FormulaColumn";
 
 export async function GET(
   req: Request,
-  { params }: { params: { tableId: string } }
+  { params }: { params: Promise<{ tabled: string }> }
 ) {
   try {
-    await connectDB();
+    await dbConnect();
+    const { tabled } = await params;
 
     const columns = await FormulaColumn.find({
-      tableId: params.tableId,
+      tableId: tabled,
     });
 
     return NextResponse.json(columns);

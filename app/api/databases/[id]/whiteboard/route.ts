@@ -4,12 +4,13 @@ import Database from "@/lib/models/Database";
 
 export async function POST(
   req: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     await dbConnect();
+    const { id } = await params;
     const body = await req.json();
-    await Database.findByIdAndUpdate(params.id, {
+    await Database.findByIdAndUpdate(id, {
       $set: { canvasData: body.canvas, updatedAt: new Date() },
     }, { upsert: true, new: true });
     return NextResponse.json({ ok: true });
@@ -21,11 +22,12 @@ export async function POST(
 
 export async function GET(
   req: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     await dbConnect();
-    const db = await Database.findById(params.id).select("canvasData");
+    const { id } = await params;
+    const db = await Database.findById(id).select("canvasData");
     return NextResponse.json({ canvas: db?.canvasData ?? null });
   } catch (err: any) {
     console.error("[API] whiteboard GET error:", err);

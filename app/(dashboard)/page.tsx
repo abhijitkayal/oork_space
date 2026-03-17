@@ -229,10 +229,6 @@ export default function Page() {
               <div className="bg-white rounded-lg shadow border border-gray-200">
                 <Whiteboard 
                   roomId="dashboard-whiteboard"
-                  width="100%"
-                  height="100%"
-                  backgroundColor="#ffffff"
-                  gridModeEnabled={false}
                 />
               </div>
             </div>

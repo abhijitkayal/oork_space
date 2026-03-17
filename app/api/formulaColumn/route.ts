@@ -1,17 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
-import { connectDB } from "@/lib/mongodb";
-import FormulaColumn from "@/models/FormulaColumn";
+import dbConnect from "@/lib/dbConnect";
+import FormulaColumn from "@/lib/models/FormulaColumn";
 
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  _context: { params: Promise<{}> }
 ) {
   try {
-    await connectDB();
+    await dbConnect();
     const body = await req.json();
+    const id = body?.id ?? req.nextUrl.searchParams.get("id");
+
+    if (!id) {
+      return NextResponse.json(
+        { error: "Formula column id is required" },
+        { status: 400 }
+      );
+    }
 
     const updated = await FormulaColumn.findByIdAndUpdate(
-      params.id,
+      id,
       { $set: body },
       { new: true }
     );

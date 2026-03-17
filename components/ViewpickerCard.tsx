@@ -104,10 +104,12 @@ const TEMPLATES: Record<string, { id: number; name: string; desc: string }[]> = 
 
 export default function ViewPickerCard({
   projectId,
+  insertAfterDatabaseId,
   onDone,
   isDark,
 }: {
   projectId: string;
+  insertAfterDatabaseId?: string | null;
   onDone: () => void;
   isDark?: boolean;
 }) {
@@ -142,6 +144,7 @@ export default function ViewPickerCard({
       icon: OPTIONS.find((o) => o.type === selectedCategory)?.icon || "📄",
       viewType: selectedCategory,
       templateName,
+      insertAfterDatabaseId: insertAfterDatabaseId ?? null,
     };
 
     try {

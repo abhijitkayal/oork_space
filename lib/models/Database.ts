@@ -20,6 +20,7 @@ const DatabaseSchema = new Schema(
     presentationData: { type: Schema.Types.Mixed,  default: null }, // Presentation
     videoData:        { type: Schema.Types.Mixed,  default: null }, // Video
     socialMediaData:  { type: Schema.Types.Mixed,  default: null }, // Social Media ✅
+    order:            { type: Number, index: true },
   },
   { timestamps: true }
 );
