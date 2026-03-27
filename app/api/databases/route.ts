@@ -2,7 +2,9 @@
 import { NextResponse } from "next/server";
 import dbConnect from "@/lib/dbConnect";
 import Database from "@/lib/models/Database";
+import Project from "@/lib/models/Project";
 import { getDefaultViews } from "@/lib/models/Database";
+import { getAuthUser } from "@/lib/authUser";
 
 type OrderedDbRef = {
   _id:   string;
@@ -33,12 +35,18 @@ async function getOrderedDatabases(projectId: string): Promise<OrderedDbRef[]> {
 /* ── GET /api/databases?projectId=xxx ── */
 export async function GET(req: Request) {
   await dbConnect();
+  const authUser = await getAuthUser();
+  if (!authUser?.userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
   const { searchParams } = new URL(req.url);
   const projectId = searchParams.get("projectId");
   if (!projectId) return NextResponse.json([]);
 
+  const ownedProject = await Project.findOne({ _id: projectId, ownerId: authUser.userId }).select("_id");
+  if (!ownedProject) return NextResponse.json([], { status: 200 });
+
   await getOrderedDatabases(projectId);
-  const dbs = await Database.find({ projectId }).sort({ order: 1, createdAt: 1 });
+  const dbs = await Database.find({ projectId, ownerId: authUser.userId }).sort({ order: 1, createdAt: 1 });
   return NextResponse.json(dbs);
 }
 
@@ -46,12 +54,20 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   try {
     await dbConnect();
+    const authUser = await getAuthUser();
+    if (!authUser?.userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
     const body = await req.json();
 
     /* ── Validate ── */
     if (!body.projectId) return NextResponse.json({ error: "projectId is required" }, { status: 400 });
     if (!body.name)       return NextResponse.json({ error: "name is required" },      { status: 400 });
     if (!body.viewType)   return NextResponse.json({ error: "viewType is required" },  { status: 400 });
+
+    const ownedProject = await Project.findOne({ _id: body.projectId, ownerId: authUser.userId }).select("_id");
+    if (!ownedProject) {
+      return NextResponse.json({ error: "Project not found" }, { status: 404 });
+    }
 
     /* ── Ordering ── */
     const orderedDbs = await getOrderedDatabases(body.projectId);
@@ -76,6 +92,7 @@ export async function POST(req: Request) {
       : getDefaultViews(body.viewType || "table");
 
     const db = await Database.create({
+      ownerId:      authUser.userId,
       projectId:    body.projectId,
       name:         body.name,
       icon:         body.icon        || "📄",

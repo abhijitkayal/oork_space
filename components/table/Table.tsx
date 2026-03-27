@@ -3,7 +3,7 @@
 
 import { useMemo, useState } from "react";
 import { useTheme } from "next-themes";
-import type { DbView } from "@/components/DatabaseViewTabs";
+import type { DbView } from "@/components/DatabaseViewtabs";
 
 /* ── Types ── */
 interface Property { id:string; name:string; type:string; formula?:string; }

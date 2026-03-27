@@ -87,6 +87,8 @@ export default function DocumentationView({
 }: {
   databaseId: string;
   templateName?: string;
+  activeViewId?: string;
+  activeView?: unknown;
 }) {
   const [title, setTitle]             = useState("Untitled Document");
   const [mode, setMode]               = useState<"editing"|"suggesting"|"viewing">("editing");

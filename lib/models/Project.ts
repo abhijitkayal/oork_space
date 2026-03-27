@@ -3,6 +3,8 @@ import mongoose, { Schema, models, model } from "mongoose";
 
 const ProjectSchema = new Schema(
   {
+    ownerId:  { type: String, index: true },
+    ownerEmail: { type: String, default: "" },
     name:     { type: String, required: true },
     emoji:    { type: String, default: "📁" },
 

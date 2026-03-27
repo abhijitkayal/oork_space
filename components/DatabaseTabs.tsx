@@ -43,7 +43,6 @@ type SectionProps = {
   projectId:    string;
   isDark:       boolean;
   isViewOnly:   boolean;
-  isActive:     boolean;
   onAddBelow:   (dbId: string) => void;
   onDragStart:  (dbId: string) => void;
   onDropOn:     (targetDbId: string) => void;
@@ -54,7 +53,7 @@ type SectionProps = {
 
 function DraggableDatabaseSection({
   db, projectId,
-  isDark, isViewOnly, isActive,
+  isDark, isViewOnly,
   onAddBelow, onDragStart, onDropOn,
   isDragging, dragEnabled, onToggleDrag,
 }: SectionProps) {
@@ -89,22 +88,14 @@ function DraggableDatabaseSection({
       onDragOver={dragEnabled  ? (e) => e.preventDefault() : undefined}
       onDrop={dragEnabled      ? () => onDropOn(db._id) : undefined}
       id={`db-section-${db._id}`}
-      className={`relative rounded-xl transition-all overflow-hidden border max-h-[700px] flex flex-col ${
-        isDragging && dragEnabled
-          ? "opacity-60 ring-2 ring-teal-500/60"
-          : isActive
-          ? isDark
-            ? "ring-2 ring-blue-500/60 border-blue-800"
-            : "ring-2 ring-blue-500/50 border-blue-200"
-          : isDark
-          ? "border-gray-700/60"
-          : "border-gray-200"
+      className={`relative rounded-xl transition-all overflow-hidden max-h-[700px] flex flex-col ${
+        isDragging && dragEnabled ? "opacity-60" : ""
       }`}
     >
       {/* ── Top drag-handle strip (not sticky — always at top since section is flex-col) ── */}
       <div className={`group flex items-center shrink-0 text-sm px-3 py-1 border-b ${
         isDark
-          ? "text-gray-300 bg-[#16171c] border-gray-700/60"
+          ? "text-gray-300 bg-transparent border-gray-700/60"
           : "text-gray-700 bg-gray-50 border-gray-200"
       }`}>
         <span
@@ -114,8 +105,8 @@ function DraggableDatabaseSection({
                 ? "cursor-grab text-gray-400 hover:bg-gray-700 hover:text-gray-200"
                 : "cursor-grab text-gray-400 hover:bg-gray-100 hover:text-gray-700"
               : isDark
-              ? "cursor-not-allowed text-gray-700"
-              : "cursor-not-allowed text-gray-300"
+              ? "cursor-grab text-gray-700"
+              : "cursor-grab text-gray-300"
           }`}
           title={dragEnabled ? "Drag to reorder" : "Enable drag mode to reorder"}
         >
@@ -190,7 +181,7 @@ export default function DatabaseTabs({
   const [insertAfterDatabaseId, setInsertAfterDatabaseId] = useState<string | null>(null);
   const [orderedIds,            setOrderedIds]            = useState<string[]>([]);
   const [draggingId,            setDraggingId]            = useState<string | null>(null);
-  const [dragEnabled,           setDragEnabled]           = useState(false);
+  const [dragEnabled,           setDragEnabled]           = useState(true);
 
   const { databasesByProject, activeDatabaseId, setActiveDatabase } = useWorkspaceStore();
   const dbs          = useMemo(() => databasesByProject[projectId] || [], [databasesByProject, projectId]);
@@ -270,7 +261,6 @@ export default function DatabaseTabs({
           projectId={projectId}
           isDark={isDark}
           isViewOnly={isViewOnly}
-          isActive={activeDatabaseId === db._id}
           onAddBelow={openCreateAfter}
           onDragStart={setDraggingId}
           onDropOn={handleDropOn}

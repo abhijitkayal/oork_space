@@ -14,6 +14,7 @@ import {
   MoreHorizontal, Pin, PinOff, Smile,
   Database, Table, Layout as LayoutIcon, CheckSquare,
   Film, BarChart2, FileCode, Link2, Globe, Presentation,
+  Folder,
 } from "lucide-react";
 
 /* ── Workspace Logo (permanent) ── */
@@ -441,18 +442,33 @@ export default function Sidebar({ view, setView }: SidebarProps) {
   useEffect(() => { setMounted(true); }, []);
 
   const fetchProjects = useCallback(async () => {
-    try { setProjects(await (await fetch("/api/projects")).json()); } catch {}
+    try {
+      const data = await (await fetch("/api/projects")).json();
+      setProjects(Array.isArray(data) ? data : []);
+    } catch {
+      setProjects([]);
+    }
   }, []);
 
   const fetchPages = useCallback(async () => {
-    try { setPages(await (await fetch("/api/sidebar")).json()); } catch {}
+    try {
+      const data = await (await fetch("/api/sidebar")).json();
+      setPages(Array.isArray(data) ? data : []);
+    } catch {
+      setPages([]);
+    }
   }, []);
 
   const fetchDatabases = useCallback(async (projectId: string) => {
     try {
-      const data: DbEntry[] = await (await fetch(`/api/databases?projectId=${projectId}`)).json();
-      setDatabasesByProject((prev) => ({ ...prev, [projectId]: data }));
-    } catch {}
+      const data = await (await fetch(`/api/databases?projectId=${projectId}`)).json();
+      setDatabasesByProject((prev) => ({
+        ...prev,
+        [projectId]: Array.isArray(data) ? data : [],
+      }));
+    } catch {
+      setDatabasesByProject((prev) => ({ ...prev, [projectId]: [] }));
+    }
   }, []);
 
   useEffect(() => { fetchProjects(); fetchPages(); }, [fetchProjects, fetchPages]);
@@ -558,7 +574,7 @@ export default function Sidebar({ view, setView }: SidebarProps) {
 
   const menuItems: { key: MenuKey; label: string; path: string; icon: React.ReactNode }[] = [
     { key: "dashboard",     label: "Dashboard",     path: "/",              icon: <LayoutGrid size={open?20:22}/> },
-    { key: "project-board", label: "Project Board", path: "/project-board", icon: <ProjectBoardIcon3D size={open?22:24}/> },
+    { key: "project-board", label: "Project Board", path: "/project-board", icon: <Folder size={open?22:24}/> },
     { key: "task-board",    label: "Task Board",    path: "/task-board",    icon: <FileText   size={open?20:22}/> },
     { key: "schedule",      label: "Schedule",      path: "/schedule",      icon: <Calendar   size={open?20:22}/> },
     { key: "activities",    label: "Activities",    path: "/activities",    icon: <Activity   size={open?20:22}/> },
@@ -593,7 +609,7 @@ export default function Sidebar({ view, setView }: SidebarProps) {
                     <div className={`absolute inset-0 w-60 ml-3 bg-gradient-to-r from-teal-600 to-rose-600 rounded-xl transition-opacity ${isActive?"opacity-100":"opacity-0 group-hover:opacity-40"}`}/>
                     <div className={`relative flex items-center ${open?"gap-3 px-4":"justify-center px-2"} py-2 ${isActive?"text-white":isDark?"text-gray-400":"text-gray-700"}`}>
                       {item.key==="project-board" ? (
-                        <span className="ml-3 flex items-center justify-center"><ProjectBoardIcon3D size={open?22:24}/></span>
+                        <span className="ml-3 flex items-center justify-center"><Folder size={open?22:24}/></span>
                       ) : itemPages.length > 0 ? (
                         <span className="text-xl flex-shrink-0 ml-3">{itemPages[0].emoji||""}</span>
                       ) : (
@@ -608,7 +624,7 @@ export default function Sidebar({ view, setView }: SidebarProps) {
                             <button
                               onClick={() => item.key==="project-board" ? setCreateProjectModalOpen(true) : openCreateModal(item.key)}
                               className={`p-1 rounded-md ${hoverClass}`} title="Add">
-                              <Plus size={16}/>
+                              {item.key!=="dashboard" && <Plus size={16}/>}
                             </button>
                             {item.key==="project-board" && (
                               <button onClick={() => setProjectBoardOpen((v)=>!v)} className={`p-1 rounded-md ${hoverClass}`}>

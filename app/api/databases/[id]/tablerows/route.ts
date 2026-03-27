@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
-import dbConnect from "@/lib/dbConnect";
+import dbConnect from "../../../../../lib/dbConnect";
 import mongoose from "mongoose";
-import Database from "@/lib/models/Database";
+import Database from "../../../../../lib/models/Database";
 
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {

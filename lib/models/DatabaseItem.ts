@@ -2,6 +2,10 @@ import mongoose from "mongoose";
 
 const DatabaseItemSchema = new mongoose.Schema(
   {
+    ownerId: {
+      type: String,
+      index: true,
+    },
     databaseId: {
       type: mongoose.Schema.Types.ObjectId,
       required: true,

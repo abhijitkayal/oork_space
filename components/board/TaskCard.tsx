@@ -1,79 +1,70 @@
-// "use client";
+export type MilestonePoint = {
+  text: string;
+  done: boolean;
+};
 
-// import { useSortable } from "@dnd-kit/sortable";
-// import { CSS } from "@dnd-kit/utilities";
+export type Milestone = {
+  title: string;
+  points: MilestonePoint[];
+};
 
-// export default function TaskCard({
-//   item,
-//   titleProp,
-// }: {
-//   item: any;
-//   titleProp: any;
-// }) {
-//   const { attributes, listeners, setNodeRef, transform, transition } =
-//     useSortable({ id: item._id });
+type TaskItem = {
+  _id: string;
+  values: {
+    title?: string;
+    description?: string;
+    milestones?: Milestone[];
+    [key: string]: unknown;
+  };
+};
 
-//   const style = {
-//     transform: CSS.Transform.toString(transform),
-//     transition,
-//   };
+type TaskCardProps = {
+  item: TaskItem;
+};
 
-//   const title = titleProp ? item.values?.[titleProp._id] : "Untitled";
+export default function TaskCard({ item }: TaskCardProps) {
+  const togglePoint = async (mIndex: number, pIndex: number) => {
+    const milestones = item.values.milestones ?? [];
+    const updated = milestones.map((m, mi) => {
+      if (mi !== mIndex) return m;
+      return {
+        ...m,
+        points: m.points.map((p, pi) => (pi === pIndex ? { ...p, done: !p.done } : p)),
+      };
+    });
 
-//   return (
-//     <div
-//       ref={setNodeRef}
-//       style={style}
-//       {...attributes}
-//       {...listeners}
-//       className="rounded-xl border bg-white shadow-sm p-3 cursor-grab active:cursor-grabbing"
-//     >
-//       <div className="text-sm font-semibold text-gray-900 line-clamp-2">
-//         {title || "Untitled"}
-//       </div>
-//     </div>
-//   );
-// }
+    const isCompleted = updated.every((m) => m.points.every((p) => p.done));
 
-"use client";
+    const newValues = {
+      ...item.values,
+      milestones: updated,
+      Status: isCompleted ? "Done" : "In Progress",
+    };
 
-import { useSortable } from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
-
-import { Card, CardContent } from "@/components/ui/card";
-
-export default function TaskCard({
-  item,
-  titleProp,
-}: {
-  item: any;
-  titleProp: any;
-}) {
-  const { attributes, listeners, setNodeRef, transform, transition } =
-    useSortable({ id: item._id });
-
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
+    await fetch(`/api/items/${item._id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ values: newValues }),
+    });
   };
 
-  const title = titleProp ? item.values?.[titleProp._id] : "Untitled";
-
   return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      {...attributes}
-      {...listeners}
-      className="cursor-grab active:cursor-grabbing touch-manipulation"
-    >
-      <Card className="shadow-sm hover:shadow-md transition-shadow bg-gradient-to-r from-teal-500 to-rose-500 dark:bg-inherit">
-        <CardContent className="p-2.5 sm:p-3">
-          <div className="text-xs sm:text-sm font-semibold line-clamp-2">
-            {title || "Untitled"}
-          </div>
-        </CardContent>
-      </Card>
+    <div className="border p-3 rounded bg-white">
+      <h3 className="font-bold">{item.values.title}</h3>
+      <p>{item.values.description}</p>
+
+      {item.values.milestones?.map((m: Milestone, i: number) => (
+        <div key={i} className="mt-2">
+          <h4 className="font-semibold">{m.title}</h4>
+
+          {m.points.map((p: MilestonePoint, j: number) => (
+            <div key={j} className="flex gap-2">
+              <input type="checkbox" checked={p.done} onChange={() => togglePoint(i, j)} />
+              <span className={p.done ? "line-through" : ""}>{p.text}</span>
+            </div>
+          ))}
+        </div>
+      ))}
     </div>
   );
 }

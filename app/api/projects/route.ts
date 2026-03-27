@@ -2,21 +2,34 @@
 import { NextResponse } from "next/server";
 import dbConnect from "@/lib/dbConnect";
 import Project from "@/lib/models/Project";
+import { getAuthUser } from "@/lib/authUser";
 
 /* ── GET /api/projects ── */
 export async function GET() {
   await dbConnect();
-  const projects = await Project.find().sort({ createdAt: -1 });
+  const authUser = await getAuthUser();
+  if (!authUser?.userId) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const projects = await Project.find({ ownerId: authUser.userId }).sort({ createdAt: -1 });
   return NextResponse.json(projects);
 }
 
 /* ── POST /api/projects ── */
 export async function POST(req: Request) {
   await dbConnect();
+  const authUser = await getAuthUser();
+  if (!authUser?.userId) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const body = await req.json();
   if (!body.name) return NextResponse.json({ error: "name is required" }, { status: 400 });
 
   const project = await Project.create({
+    ownerId:     authUser.userId,
+    ownerEmail:  authUser.email || "",
     name:        body.name,
     emoji:       body.emoji       || "📁",
     status:      body.status      || "Not started",

@@ -4,7 +4,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTheme } from "next-themes";
 import TodoTaskModal from "./TodoTaskModal";
-import type { DbView } from "@/components/DatabaseViewTabs";
+import type { DbView } from "@/components/DatabaseViewtabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -354,7 +354,7 @@ export default function TodoView({
   /* ── ALL TASKS → original checkbox list ── */
   return (
     <>
-      <Card className={`${isDark?"bg-black border-white":"bg-gray-100"} rounded-xl border overflow-hidden`}>
+      <Card className={`${isDark?"bg-transparent border-white":"bg-gray-50"} rounded-xl border overflow-hidden`}>
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>To-do</CardTitle>
           <Button onClick={createTask} size="sm"><Plus className="mr-2 h-4 w-4"/>New</Button>

@@ -425,8 +425,14 @@ function ChartTemplatePreview({ templateId }: { templateId: number }) {
       label:"Column Chart", icon:"📊", color:"from-rose-600 to-pink-400",
       preview: (
         <svg viewBox="0 0 80 50" className="w-full h-full">
-          {[[5,38,12,"#f87171","#fb923c"],[20,28,12,"#f87171","#fb923c"],[35,42,12,"#f87171","#fb923c"],[50,22,12,"#f87171","#fb923c"],[65,35,12,"#f87171","#fb923c"]].map(([x,h,w,c1,c2],i)=>(
-            <rect key={i} x={x} y={50-h} width={w} height={h} fill={`url(#cg${i})`} rx={1}/>
+          {[
+            { x: 5, h: 38, w: 12 },
+            { x: 20, h: 28, w: 12 },
+            { x: 35, h: 42, w: 12 },
+            { x: 50, h: 22, w: 12 },
+            { x: 65, h: 35, w: 12 },
+          ].map(({ x, h, w }, i) => (
+            <rect key={i} x={x} y={50 - h} width={w} height={h} fill={`url(#cg${i})`} rx={1} />
           ))}
           <defs>
             {[0,1,2,3,4].map(i=>(

@@ -3,7 +3,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTheme } from "next-themes";
-import type { DbView } from "@/components/DatabaseViewTabs";
+import type { DbView } from "@/components/DatabaseViewtabs";
 import AddPropertyModal  from "./AddPropertyModal";
 import GalleryItemModal  from "./GalleryItemModal";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";

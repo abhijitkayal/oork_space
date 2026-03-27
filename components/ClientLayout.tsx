@@ -32,7 +32,7 @@ export default function ClientLayout({ children }: ClientLayoutProps) {
   const { resolvedTheme } = useTheme();
   const pathname = usePathname();
   const router = useRouter();
-  const { isAuthenticated, isLoading: authLoading, checkAuth } = useAuth();
+  const { user, isAuthenticated, isLoading: authLoading, checkAuth } = useAuth();
    
   // Use state with lazy initialization to avoid hydration mismatch
   const [mounted, setMounted] = useState(() => {
@@ -63,13 +63,13 @@ export default function ClientLayout({ children }: ClientLayoutProps) {
 
   // Handle redirect after auth check - use setTimeout to avoid synchronous setState
   useEffect(() => {
-    if (mounted && isAuthenticated && isAuthPage) {
+    if (mounted && isAuthenticated && isAuthPage && user?.id) {
       setTimeout(() => {
         setRedirecting(true);
-        router.push('/');
+        router.push(`/${user.id}`);
       }, 0);
     }
-  }, [mounted, isAuthenticated, isAuthPage, router]);
+  }, [mounted, isAuthenticated, isAuthPage, user?.id, router]);
 
   // Reset redirecting state when we leave auth pages or when pathname changes
   useEffect(() => {
@@ -120,6 +120,15 @@ export default function ClientLayout({ children }: ClientLayoutProps) {
         <div className="min-h-screen flex items-center justify-center bg-[#1a1625]">
           {children}
         </div>
+      </LayoutContext.Provider>
+    );
+  }
+
+  // Auth and shared pages use their own layout and should not render app chrome.
+  if (isAuthPage || isSharedPage) {
+    return (
+      <LayoutContext.Provider value={{ view, setView }}>
+        {children}
       </LayoutContext.Provider>
     );
   }

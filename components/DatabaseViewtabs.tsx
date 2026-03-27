@@ -87,7 +87,7 @@ const COLUMN_HEADERS = [
 export default function DatabaseViewTabs({
   dbId, dbName, dbIcon, viewType, projectId,
   views, activeViewId, isDark,
-  dragEnabled, onToggleDrag,
+  dragEnabled=true, onToggleDrag,
   onViewChange, onViewsChange,
 }: DatabaseViewTabsProps) {
   const MAX_VISIBLE = 3;
@@ -195,8 +195,8 @@ export default function DatabaseViewTabs({
 
   /* ── Sticky wrapper bg ── */
   const stickyBg = isDark
-    ? "bg-[#0f1014]/95 border-gray-700/60"
-    : "bg-white/95 border-gray-200";
+    ? "bg-transparent/95 border-gray-700/60"
+    : "bg-transparent/95 border-gray-200";
 
   const visibleViews = views.slice(0, MAX_VISIBLE);
   const hiddenViews  = views.slice(MAX_VISIBLE);
@@ -387,7 +387,7 @@ export default function DatabaseViewTabs({
           )}
 
           {/* ✅ Drag On/Off toggle */}
-          <button
+          {/* <button
             onClick={onToggleDrag}
             title={dragEnabled ? "Disable drag mode" : "Enable drag mode to reorder sections"}
             className={`flex items-center gap-1.5 px-3 py-1.5 ml-1 rounded-lg text-xs font-semibold border transition-all select-none ${
@@ -403,13 +403,13 @@ export default function DatabaseViewTabs({
             {dragEnabled
               ? <><Unlock size={12} />Drag On</>
               : <><Lock   size={12} />Drag Off</>}
-          </button>
+          </button> */}
         </div>
       </div>
 
       {/* ══ ROW 3: Column header bar (sticky) ══════════════════ */}
       <div className={`flex items-center gap-1 px-4 py-1.5 text-xs border-t ${
-        isDark ? "border-gray-700/60 bg-[#16171c]" : "border-gray-100 bg-gray-50/80"
+        isDark ? "border-gray-700/60 bg-transparent" : "border-gray-100 bg-gray-50/80"
       }`}>
         {COLUMN_HEADERS
           .filter((col) => !viewSettings.hiddenProperties.includes(col.key))

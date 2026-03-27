@@ -464,6 +464,7 @@ export default function WhiteboardView({ databaseId }: { databaseId: string }) {
   return (
     <div className="flex flex-col w-full h-full overflow-hidden bg-[#0d0d0f] rounded-xl border border-white/[0.06]">
 
+      <div className="absolute top-28 rounded-xl z-30 w-full pr-2">
       {/* ══ TOOLBAR ROW 1 ══ */}
       <div className="flex items-center gap-0.5 px-2 py-1.5 bg-[#111114] border-b border-white/[0.06] shrink-0 flex-wrap">
 
@@ -724,6 +725,7 @@ export default function WhiteboardView({ databaseId }: { databaseId: string }) {
         <div className="ml-auto hidden sm:block">
           <span className="text-[8px] text-gray-600">V P E R C T · Ctrl+Z/Y/S</span>
         </div>
+      </div>
       </div>
 
       {/* ══ CANVAS AREA — scrollable ══ */}

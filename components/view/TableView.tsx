@@ -7,8 +7,17 @@ import { useTableStore } from "@/app/store/TableStore";
 import TableCell from "@/components/TableCell";
 import TableColumnHeader from "../../components/TablecolumnHeader";
 import FormulaModal from "@/components/formula/FormulaModal";
+import type { DbView } from "@/components/DatabaseViewtabs";
 
-export default function TableView({ databaseId, isViewOnly = false }: { databaseId: string; isViewOnly?: boolean }) {
+export default function TableView({
+  databaseId,
+  isViewOnly = false,
+}: {
+  databaseId: string;
+  isViewOnly?: boolean;
+  activeViewId?: string;
+  activeView?: DbView;
+}) {
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === "dark";
 

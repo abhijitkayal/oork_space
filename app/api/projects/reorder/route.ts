@@ -1,17 +1,25 @@
 import { NextResponse } from "next/server";
 import dbConnect from "@/lib/dbConnect";
 import Database from "@/lib/models/Database";
+import Project from "@/lib/models/Project";
+import { getAuthUser } from "@/lib/authUser";
 
 export async function GET(req: Request) {
   try {
     await dbConnect();
+    const authUser = await getAuthUser();
+    if (!authUser?.userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
     const { searchParams } = new URL(req.url);
     const projectId = searchParams.get("projectId");
 
     // ✅ Always return valid JSON — empty array instead of empty body
     if (!projectId) return NextResponse.json([]);
 
-    const dbs = await Database.find({ projectId }).sort({ createdAt: 1 });
+    const ownedProject = await Project.findOne({ _id: projectId, ownerId: authUser.userId }).select("_id");
+    if (!ownedProject) return NextResponse.json([]);
+
+    const dbs = await Database.find({ projectId, ownerId: authUser.userId }).sort({ createdAt: 1 });
     return NextResponse.json(dbs);
   } catch (err: any) {
     console.error("GET /api/databases error:", err);
@@ -22,6 +30,9 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   try {
     await dbConnect();
+    const authUser = await getAuthUser();
+    if (!authUser?.userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
     const body = await req.json();
 
     if (!body.projectId) {
@@ -34,7 +45,11 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "viewType is required" }, { status: 400 });
     }
 
+    const ownedProject = await Project.findOne({ _id: body.projectId, ownerId: authUser.userId }).select("_id");
+    if (!ownedProject) return NextResponse.json({ error: "Project not found" }, { status: 404 });
+
     const db = await Database.create({
+      ownerId: authUser.userId,
       projectId: body.projectId,
       name: body.name,
       icon: body.icon || "📄",

@@ -54,6 +54,7 @@ export async function POST(req: Request) {
         message: "Login successful",
         user: {
           id: user._id,
+          name: user.name,
           email: user.email,
         },
       });
@@ -117,6 +118,7 @@ export async function POST(req: Request) {
       message: "Login successful",
       user: {
         id: user._id,
+        name: user.name,
         email: user.email,
       },
     });

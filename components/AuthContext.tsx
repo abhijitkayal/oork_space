@@ -29,39 +29,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const checkAuth = useCallback(async () => {
     setIsLoading(true);
     try {
-      // Check for token in cookies
-      const token = document.cookie
-        .split('; ')
-        .find(row => row.startsWith('token='))
-        ?.split('=')[1];
-      
-      if (!token) {
-        // Only set user to null if we don't already have a user from login
-        if (user === null) {
-          setUser(null);
-        }
-        // Return early - redirect will be handled in useEffect
+      const res = await fetch("/api/auth/me", {
+        method: "GET",
+        credentials: "include",
+        cache: "no-store",
+      });
+
+      if (!res.ok) {
+        setUser(null);
         return;
+      }
+
+      const data = await res.json();
+      if (data?.user?.id && data?.user?.email) {
+        setUser({ id: data.user.id, email: data.user.email, name: data.user.name });
       } else {
-        // Token exists, user is authenticated
-        // For now, we'll set a placeholder user
-        // In production, you'd verify the token with the backend
-        // Only set from token if we don't already have a user (e.g., from login function)
-        if (user === null) {
-          setUser({ id: "1", email: "user@example.com" });
-        }
-        // If we already have a user, we assume it's more complete or equally valid
+        setUser(null);
       }
     } catch (error) {
       console.error("Auth check error:", error);
-      // Only set user to null if we don't already have a user from login
-      if (user === null) {
-        setUser(null);
-      }
+      setUser(null);
     } finally {
       setIsLoading(false);
     }
-  }, [router, user]);
+  }, []);
 
   useEffect(() => {
     checkAuth();
@@ -69,7 +60,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Handle redirects separately to avoid React state update errors
   useEffect(() => {
-    if (!isLoading && !user && !pathname?.startsWith("/login") && !pathname?.startsWith("/signup")) {
+    if (!isLoading && !user && !pathname?.startsWith("/login") && !pathname?.startsWith("/signup") && !pathname?.startsWith("/forget-password") && !pathname?.startsWith("/shared")) {
       router.push("/login");
     }
   }, [isLoading, user, pathname, router]);
@@ -88,8 +79,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       console.error("Logout error:", error);
     } finally {
-      // Clear the token cookie
-      document.cookie = "token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
       setUser(null);
       router.push("/login");
     }

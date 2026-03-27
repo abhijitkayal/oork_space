@@ -1,9 +1,13 @@
 import { NextResponse } from "next/server";
 import connectDB from "@/lib/dbConnect";
 import DatabaseItem from "@/lib/models/DatabaseItem";
+import Database from "@/lib/models/Database";
+import { getAuthUser } from "@/lib/authUser";
 
 export async function GET(req: Request) {
   await connectDB();
+  const authUser = await getAuthUser();
+  if (!authUser?.userId) return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
 
   const { searchParams } = new URL(req.url);
   const databaseId = searchParams.get("databaseId");
@@ -12,7 +16,10 @@ export async function GET(req: Request) {
     return NextResponse.json([], { status: 200 });
   }
 
-  const items = await DatabaseItem.find({ databaseId }).sort({
+  const ownedDatabase = await Database.findOne({ _id: databaseId, ownerId: authUser.userId }).select("_id");
+  if (!ownedDatabase) return NextResponse.json([], { status: 200 });
+
+  const items = await DatabaseItem.find({ databaseId, ownerId: authUser.userId }).sort({
     createdAt: -1,
   });
 
@@ -21,6 +28,8 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   await connectDB();
+  const authUser = await getAuthUser();
+  if (!authUser?.userId) return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
 
   const body = await req.json();
   const { databaseId, values } = body;
@@ -32,7 +41,13 @@ export async function POST(req: Request) {
     );
   }
 
+  const ownedDatabase = await Database.findOne({ _id: databaseId, ownerId: authUser.userId }).select("_id");
+  if (!ownedDatabase) {
+    return NextResponse.json({ message: "Database not found" }, { status: 404 });
+  }
+
   const created = await DatabaseItem.create({
+    ownerId: authUser.userId,
     databaseId,
     values: values || {},
   });

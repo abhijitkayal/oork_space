@@ -246,7 +246,7 @@ export default function TextView({ databaseId }: { databaseId: string }) {
 
   return (
     <TooltipProvider>
-      <Card className={`${!isDark ? "bg-gray-100" : ""} rounded-xl border overflow-hidden`}>
+      <Card className={`${!isDark ? "bg-gray-50" : "bg-transparent"} rounded-xl border overflow-hidden`}>
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>Text</CardTitle>
 
@@ -262,7 +262,7 @@ export default function TextView({ databaseId }: { databaseId: string }) {
           <ScrollArea className="h-[520px]">
             <div className="p-4 space-y-6">
               {blocks.map((b) => (
-                <Card key={b._id} className={!isDark ? 'bg-rose-50' : ''}>
+                <Card key={b._id} className={!isDark ? 'bg-rose-50' : 'bg-transparent'}>
                   <CardContent className="space-y-3 p-4">
                     {/* Title */}
                     <Input

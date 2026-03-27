@@ -317,7 +317,7 @@ export default function NumberListView({ databaseId }: { databaseId: string }) {
 
   return (
     <TooltipProvider>
-      <Card className={`${!isDark ? "bg-gray-100" : ""} rounded-xl border overflow-hidden`}>
+      <Card className={`${!isDark ? "bg-gray-100" : "bg-transparent"} rounded-xl border overflow-hidden`}>
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>Numbered list</CardTitle>
 

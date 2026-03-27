@@ -1,540 +1,880 @@
 // components/board/BoardView.tsx
 "use client";
 
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useTheme } from "next-themes";
-import { Plus, MoreHorizontal, Calendar as CalendarIcon } from "lucide-react";
+import { Calendar as CalendarIcon, MoreHorizontal, Plus } from "lucide-react";
 import type { DbView } from "@/components/DatabaseViewtabs";
 import {
-  DndContext, closestCorners, KeyboardSensor, PointerSensor,
-  useSensor, useSensors, type DragEndEvent, type UniqueIdentifier,
+  DndContext,
+  closestCorners,
+  type DragEndEvent,
+  KeyboardSensor,
+  PointerSensor,
+  type UniqueIdentifier,
+  useSensor,
+  useSensors,
 } from "@dnd-kit/core";
 import {
-  SortableContext, sortableKeyboardCoordinates,
-  useSortable, verticalListSortingStrategy,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
 
-/* ── Types ── */
-interface Tag  { label: string; color: string; }
-interface Task {
-  id:        UniqueIdentifier;
-  title:     string;
-  tags:      Tag[];
-  date:      string;
-  avatars:   string[];
-  assignee?: string;
-  status?:   string;
-  priority?: "Low" | "Medium" | "High";
-  progress?: number;   // 0-100
+interface Tag {
+  label: string;
+  color: string;
 }
-interface Column { id: UniqueIdentifier; title: string; color: string; tasks: Task[]; }
 
-/* ── Static demo data ── */
-const INITIAL_COLUMNS: Column[] = [
-  {
-    id: "todo", title: "To Do", color: "indigo",
-    tasks: [
-      { id:1, title:"Logo Idea's visualizations from brainstorming session.", tags:[{label:"Important",color:"pink"},{label:"Visualization",color:"yellow"}], date:"Jan 20 - 25", avatars:["bg-purple-500","bg-blue-500","bg-green-500"], assignee:"me",   status:"To Do",        priority:"High",   progress:0  },
-      { id:2, title:"Generate proposed colours for initiating proposal.",     tags:[{label:"Important",color:"pink"},{label:"Conceptualization",color:"cyan"}], date:"Feb 21 - 25", avatars:["bg-blue-500","bg-purple-500"], assignee:"Alice", status:"To Do",        priority:"Medium", progress:20 },
-      { id:3, title:"Make a budget proposal ASAP",                            tags:[{label:"Finance",color:"gray"},{label:"Budget",color:"lime"}], date:"Mar 01 - 25", avatars:["bg-green-500","bg-blue-500"], assignee:"me",   status:"To Do",        priority:"Low",    progress:0  },
-    ],
-  },
-  {
-    id: "working", title: "Working in progress", color: "amber",
-    tasks: [
-      { id:5, title:"Define brand tone and messaging guidelines",         tags:[{label:"High",color:"red"},{label:"UI design",color:"yellow"}], date:"Mar 20 - 25", avatars:["bg-blue-500","bg-purple-500"], assignee:"me",   status:"Working in progress", priority:"High",   progress:60 },
-      { id:6, title:"Outline a marketing plan for the Super Bowl launch", tags:[{label:"Medium",color:"orange"},{label:"Off track",color:"red"}], date:"Jan 16 - 25", avatars:["bg-green-500","bg-blue-500"], assignee:"Bob", status:"Working in progress", priority:"Medium", progress:35 },
-    ],
-  },
-  {
-    id: "inprogress", title: "In Progress", color: "blue",
-    tasks: [
-      { id:8, title:"Draft a press release for the brand relaunch",    tags:[{label:"Low",color:"cyan"},{label:"Visualization",color:"yellow"}], date:"Mar 25 - 25", avatars:["bg-purple-500","bg-blue-500"], assignee:"me",   status:"In Progress", priority:"Medium", progress:75 },
-      { id:9, title:"Coordinate with vendors for production materials", tags:[{label:"High",color:"red"},{label:"Visualization",color:"yellow"}],  date:"Mar 25 - 25", avatars:["bg-green-500","bg-blue-500"], assignee:"Alice", status:"In Progress", priority:"High",   progress:50 },
-    ],
-  },
-  {
-    id: "done", title: "Done", color: "emerald",
-    tasks: [
-      { id:10, title:"Logo Idea's visualizations from brainstorming session.", tags:[{label:"Important",color:"pink"},{label:"Visualization",color:"yellow"}], date:"Jan 20 - 25", avatars:["bg-purple-500","bg-blue-500","bg-green-500"], assignee:"me",   status:"Done", priority:"Low",  progress:100 },
-      { id:11, title:"Define brand tone and messaging guidelines",             tags:[{label:"High",color:"red"},{label:"UI design",color:"yellow"}],           date:"Mar 20 - 25", avatars:["bg-blue-500","bg-purple-500"], assignee:"Bob", status:"Done", priority:"High", progress:100 },
-    ],
-  },
-];
+interface MilestonePoint {
+  text: string;
+  done: boolean;
+}
 
-/* ── Status config for By Status view ── */
-const STATUS_COLS: { id: string; label: string; dot: string; bg: { dark:string; light:string }; card: { dark:string; light:string } }[] = [
-  {
-    id:"To Do", label:"To Do", dot:"#6b7280",
-    bg:   { dark:"#13151b", light:"#f3f4f6" },
-    card: { dark:"#1c1f28", light:"#ffffff"  },
-  },
-  {
-    id:"Working in progress", label:"Working in progress", dot:"#f59e0b",
-    bg:   { dark:"#171208", light:"#fffbeb" },
-    card: { dark:"#221a08", light:"#ffffff"  },
-  },
-  {
-    id:"In Progress", label:"In Progress", dot:"#3b82f6",
-    bg:   { dark:"#0e1520", light:"#eff6ff" },
-    card: { dark:"#121d2e", light:"#ffffff"  },
-  },
-  {
-    id:"Done", label:"Done", dot:"#10b981",
-    bg:   { dark:"#0c1a12", light:"#ecfdf5" },
-    card: { dark:"#101f15", light:"#ffffff"  },
-  },
-];
+interface Milestone {
+  title: string;
+  points: MilestonePoint[];
+}
 
-/* ── Priority badge colours ── */
-const PRI: Record<string, { dark:string; light:string }> = {
-  Low:    { dark:"bg-emerald-950/60 text-emerald-400 border border-emerald-800/50", light:"bg-emerald-100 text-emerald-700 border border-emerald-200" },
-  Medium: { dark:"bg-amber-950/60   text-amber-400   border border-amber-800/50",   light:"bg-amber-100   text-amber-700   border border-amber-200"   },
-  High:   { dark:"bg-red-950/60     text-red-400     border border-red-800/50",     light:"bg-red-100     text-red-700     border border-red-200"     },
+interface Task {
+  id: UniqueIdentifier;
+  dbId?: string;
+  title: string;
+  description?: string;
+  fromDate?: string;
+  toDate?: string;
+  milestones?: Milestone[];
+  tags: Tag[];
+  date: string;
+  avatars: string[];
+  assignee?: string;
+  status?: string;
+  priority?: "Low" | "Medium" | "High";
+  progress?: number;
+}
+
+interface Column {
+  id: UniqueIdentifier;
+  title: string;
+  color: string;
+  tasks: Task[];
+}
+
+interface TaskFormData {
+  title: string;
+  description: string;
+  fromDate: string;
+  toDate: string;
+  milestones: Milestone[];
+}
+
+interface DatabaseBoardItem {
+  _id: string;
+  values?: {
+    title?: string;
+    description?: string;
+    fromDate?: string;
+    toDate?: string;
+    milestones?: Milestone[];
+    Status?: string;
+    progress?: number;
+  };
+}
+
+const EMPTY_FORM: TaskFormData = {
+  title: "",
+  description: "",
+  fromDate: "",
+  toDate: "",
+  milestones: [],
 };
 
-/* ── Tag colours ── */
+const INITIAL_COLUMNS: Column[] = [
+  {
+    id: "todo",
+    title: "To Do",
+    color: "indigo",
+    tasks: [
+      {
+        id: 1,
+        title: "Draft launch task list",
+        tags: [{ label: "To Do", color: "gray" }],
+        date: "No date",
+        avatars: ["bg-teal-500"],
+        assignee: "me",
+        status: "To Do",
+        priority: "Medium",
+        milestones: [],
+      },
+    ],
+  },
+  { id: "working", title: "Working in progress", color: "amber", tasks: [] },
+  { id: "inprogress", title: "In Progress", color: "blue", tasks: [] },
+  { id: "done", title: "Done", color: "emerald", tasks: [] },
+];
+
+const COLUMN_ID_TO_STATUS: Record<string, string> = {
+  todo: "To Do",
+  working: "Working in progress",
+  inprogress: "In Progress",
+  done: "Done",
+};
+
+const STATUS_TO_COLUMN_ID: Record<string, string> = {
+  "To Do": "todo",
+  "Working in progress": "working",
+  "In Progress": "inprogress",
+  Done: "done",
+};
+
 function getTagCls(color: string, isDark: boolean) {
   const map: Record<string, string> = {
-    pink:   isDark ? "bg-pink-500/20 text-pink-300"   : "bg-pink-100 text-pink-700",
-    yellow: isDark ? "bg-yellow-500/20 text-yellow-300": "bg-yellow-100 text-yellow-700",
-    cyan:   isDark ? "bg-cyan-500/20 text-cyan-300"   : "bg-cyan-100 text-cyan-700",
-    gray:   isDark ? "bg-gray-500/20 text-gray-300"   : "bg-gray-100 text-gray-700",
-    lime:   isDark ? "bg-lime-500/20 text-lime-300"   : "bg-lime-100 text-lime-700",
-    red:    isDark ? "bg-red-500/20 text-red-300"     : "bg-red-100 text-red-700",
-    orange: isDark ? "bg-orange-500/20 text-orange-300": "bg-orange-100 text-orange-700",
+    gray: isDark ? "bg-gray-500/20 text-gray-300" : "bg-gray-100 text-gray-700",
+    cyan: isDark ? "bg-cyan-500/20 text-cyan-300" : "bg-cyan-100 text-cyan-700",
+    red: isDark ? "bg-red-500/20 text-red-300" : "bg-red-100 text-red-700",
+    orange: isDark ? "bg-orange-500/20 text-orange-300" : "bg-orange-100 text-orange-700",
+    yellow: isDark ? "bg-yellow-500/20 text-yellow-300" : "bg-yellow-100 text-yellow-700",
   };
+
   return map[color] ?? (isDark ? "bg-gray-500/20 text-gray-300" : "bg-gray-100 text-gray-700");
 }
 
-/* ── Utility ── */
+function formatDateRange(fromDate?: string, toDate?: string) {
+  if (!fromDate && !toDate) return "No date";
+  if (fromDate && toDate) return `${fromDate} - ${toDate}`;
+  return fromDate || toDate || "No date";
+}
+
+function getMilestoneProgress(milestones?: Milestone[], fallbackProgress = 0) {
+  if (!milestones || milestones.length === 0) return fallbackProgress;
+
+  const allPoints = milestones.flatMap((m) => m.points || []);
+  if (allPoints.length === 0) return fallbackProgress;
+
+  const doneCount = allPoints.filter((p) => p.done).length;
+  return Math.round((doneCount / allPoints.length) * 100);
+}
+
+function getMilestonePointStats(milestones?: Milestone[]) {
+  if (!milestones || milestones.length === 0) return { done: 0, total: 0 };
+  const allPoints = milestones.flatMap((m) => m.points || []);
+  return {
+    done: allPoints.filter((p) => p.done).length,
+    total: allPoints.length,
+  };
+}
+
+function mapDatabaseItemToTask(item: DatabaseBoardItem): Task {
+  const values = item.values || {};
+  const status = values.Status || "To Do";
+  const progress = getMilestoneProgress(values.milestones, typeof values.progress === "number" ? values.progress : 0);
+
+  return {
+    id: item._id,
+    dbId: item._id,
+    title: values.title || "Untitled task",
+    description: values.description || "",
+    fromDate: values.fromDate || "",
+    toDate: values.toDate || "",
+    milestones: Array.isArray(values.milestones) ? values.milestones : [],
+    tags: [{ label: status, color: "cyan" }],
+    date: formatDateRange(values.fromDate, values.toDate),
+    avatars: ["bg-teal-500"],
+    status,
+    priority: "Medium",
+    progress,
+  };
+}
+
 function arrayMove<T>(arr: T[], from: number, to: number): T[] {
   const next = [...arr];
   const [el] = next.splice(from, 1);
   next.splice(to, 0, el);
   return next;
 }
+
 function findCol(cols: Column[], id: UniqueIdentifier) {
   return cols.find((c) => c.id === id) ?? cols.find((c) => c.tasks.some((t) => t.id === id));
 }
 
-/* ══════════════════════════════════════════════════════════════
-   BY STATUS VIEW — Kanban with progress bars
-   (matches the screenshot with progress % + bar + priority badge)
-══════════════════════════════════════════════════════════════ */
-function ByStatusKanban({ isDark, tasks }: { isDark: boolean; tasks: Task[] }) {
-  const [localTasks, setLocalTasks] = useState<Task[]>(tasks);
+function CreateTaskModal({
+  isOpen,
+  isDark,
+  isSaving,
+  defaultStatus,
+  onClose,
+  onSave,
+}: {
+  isOpen: boolean;
+  isDark: boolean;
+  isSaving: boolean;
+  defaultStatus: string;
+  onClose: () => void;
+  onSave: (form: TaskFormData) => Promise<void>;
+}) {
+  const [form, setForm] = useState<TaskFormData>(EMPTY_FORM);
 
-  useEffect(() => { setLocalTasks(tasks); }, [tasks]);
+  if (!isOpen) return null;
 
-  /* group tasks by status */
-  const grouped = useMemo(() => {
-    const map: Record<string, Task[]> = {};
-    STATUS_COLS.forEach((c) => { map[c.id] = []; });
-    localTasks.forEach((t) => {
-      const s = t.status || "To Do";
-      if (!map[s]) map[s] = [];
-      map[s].push(t);
+  const updateMilestoneTitle = (milestoneIndex: number, value: string) => {
+    setForm((prev) => {
+      const milestones = [...prev.milestones];
+      milestones[milestoneIndex] = { ...milestones[milestoneIndex], title: value };
+      return { ...prev, milestones };
     });
-    return map;
-  }, [localTasks]);
-
-  const moveTask = (taskId: UniqueIdentifier, toStatus: string) => {
-    setLocalTasks((prev) =>
-      prev.map((t) => t.id === taskId ? { ...t, status: toStatus } : t)
-    );
   };
 
-  const setProgress = (taskId: UniqueIdentifier, progress: number) => {
-    setLocalTasks((prev) =>
-      prev.map((t) => t.id === taskId ? { ...t, progress } : t)
-    );
+  const updatePointText = (milestoneIndex: number, pointIndex: number, value: string) => {
+    setForm((prev) => {
+      const milestones = [...prev.milestones];
+      const points = [...milestones[milestoneIndex].points];
+      points[pointIndex] = { ...points[pointIndex], text: value };
+      milestones[milestoneIndex] = { ...milestones[milestoneIndex], points };
+      return { ...prev, milestones };
+    });
   };
 
-  /* ── Status card ── */
-  function StatusCard({ task, statusCol }: { task: Task; statusCol: typeof STATUS_COLS[0] }) {
-    const [dragging,    setDragging]    = useState(false);
-    const [editingProg, setEditingProg] = useState(false);
-    const progress = task.progress ?? 0;
-    const priority = task.priority || "Medium";
-    const priCls   = isDark ? PRI[priority]?.dark : PRI[priority]?.light;
+  const updatePointDone = (milestoneIndex: number, pointIndex: number, checked: boolean) => {
+    setForm((prev) => {
+      const milestones = [...prev.milestones];
+      const points = [...milestones[milestoneIndex].points];
+      points[pointIndex] = { ...points[pointIndex], done: checked };
+      milestones[milestoneIndex] = { ...milestones[milestoneIndex], points };
+      return { ...prev, milestones };
+    });
+  };
 
-    /* bar gradient per status */
-    const barGrad =
-      statusCol.id === "Done"               ? "from-emerald-500 to-teal-400" :
-      statusCol.id === "In Progress"        ? "from-blue-500 to-teal-500"    :
-      statusCol.id === "Working in progress"? "from-amber-500 to-orange-400" :
-                                              "from-teal-600 to-emerald-500";
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <div className={`w-full max-w-2xl rounded-2xl border p-5 ${isDark ? "border-gray-700 bg-[#151821] text-gray-100" : "border-gray-200 bg-white text-gray-900"}`}>
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="text-lg font-semibold">Create Task ({defaultStatus})</h2>
+          <button onClick={onClose} className={`rounded-md px-2 py-1 text-sm ${isDark ? "hover:bg-gray-800" : "hover:bg-gray-100"}`}>Close</button>
+        </div>
 
-    const cardBg   = isDark ? statusCol.card.dark : statusCol.card.light;
-    const cardBord = isDark
-      ? `1px solid rgba(255,255,255,${dragging ? "0.15" : "0.07"})`
-      : `1px solid rgba(0,0,0,${dragging ? "0.12" : "0.06"})`;
-
-    return (
-      <div
-        draggable
-        onDragStart={() => setDragging(true)}
-        onDragEnd={() => setDragging(false)}
-        style={{
-          background: cardBg,
-          border: cardBord,
-          borderRadius: 14,
-          padding: "14px 14px 12px",
-          cursor: "grab",
-          opacity: dragging ? 0.5 : 1,
-          transition: "border-color 0.15s, opacity 0.15s",
-          position: "relative",
-        }}
-      >
-        {/* Title */}
-        <p style={{ fontSize:13, fontWeight:600, color: isDark?"#f1f5f9":"#111827",
-          lineHeight:1.45, marginBottom:12 }}>
-          {task.title}
-        </p>
-
-        {/* Progress % */}
-        <p style={{ fontSize:11, color: isDark?"#6b7280":"#9ca3af",
-          marginBottom:6, fontVariantNumeric:"tabular-nums" }}>
-          {progress}%
-        </p>
-
-        {/* Progress bar — click to edit */}
-        {editingProg ? (
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
           <input
-            type="range" min={0} max={100} step={5} value={progress}
-            autoFocus
-            onChange={(e) => setProgress(task.id, Number(e.target.value))}
-            onBlur={() => setEditingProg(false)}
-            onClick={(e) => e.stopPropagation()}
-            style={{ width:"100%", marginBottom:10, accentColor:"#0d9488", cursor:"pointer", display:"block" }}
+            title="Task title"
+            aria-label="Task title"
+            value={form.title}
+            onChange={(e) => setForm((prev) => ({ ...prev, title: e.target.value }))}
+            placeholder="Title"
+            className={`rounded-lg border px-3 py-2 text-sm outline-none ${isDark ? "border-gray-700 bg-[#1d2230]" : "border-gray-300 bg-white"}`}
           />
-        ) : (
-          <div
-            onClick={(e) => { e.stopPropagation(); setEditingProg(true); }}
-            title="Click to adjust progress"
-            style={{
-              width:"100%", height:6, borderRadius:999, marginBottom:10,
-              background: isDark ? "rgba(255,255,255,0.08)" : "#e5e7eb",
-              overflow:"hidden", cursor:"pointer",
-            }}
-          >
-            <div
-              className={`h-full rounded-full bg-gradient-to-r ${barGrad} transition-all duration-500`}
-              style={{ width:`${progress}%`, minWidth: progress > 0 ? 6 : 0 }}
-            />
-          </div>
-        )}
-
-        {/* Priority badge */}
-        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-md text-[11px] font-semibold ${priCls}`}>
-          {priority}
-        </span>
-      </div>
-    );
-  }
-
-  /* ── Status column ── */
-  function StatusColumn({ col }: { col: typeof STATUS_COLS[0] }) {
-    const colTasks  = grouped[col.id] ?? [];
-    const [over, setOver] = useState(false);
-    const bgCol = isDark ? col.bg.dark : col.bg.light;
-
-    return (
-      <div
-        onDragOver={(e) => { e.preventDefault(); setOver(true); }}
-        onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setOver(false); }}
-        onDrop={(e) => {
-          e.preventDefault(); setOver(false);
-          /* find which task was being dragged — check data-taskid on dragged el */
-          const id = Number((e.dataTransfer as any)._taskId ?? 0);
-          /* fallback: we track via closure in each card's dragStart */
-        }}
-        style={{
-          flex:1, minWidth:240, maxWidth:340,
-          background: bgCol,
-          borderRadius:18, display:"flex", flexDirection:"column",
-          outline: over ? "2px solid rgba(59,130,246,0.4)" : "2px solid transparent",
-          transition:"outline 0.15s",
-        }}
-      >
-        {/* Header */}
-        <div style={{ display:"flex", alignItems:"center", gap:8, padding:"14px 16px 10px" }}>
-          <span style={{ width:10, height:10, borderRadius:"50%", background:col.dot, flexShrink:0 }}/>
-          <span style={{ fontSize:14, fontWeight:700, color: isDark?"#e2e8f0":"#1f2937" }}>
-            {col.label}
-          </span>
-          <span style={{
-            fontSize:12, fontWeight:700,
-            padding:"1px 8px", borderRadius:999,
-            background: isDark?"rgba(255,255,255,0.07)":"rgba(0,0,0,0.06)",
-            color: isDark?"#6b7280":"#9ca3af",
-          }}>
-            {colTasks.length}
-          </span>
+          <input
+            title="Task description"
+            aria-label="Task description"
+            value={form.description}
+            onChange={(e) => setForm((prev) => ({ ...prev, description: e.target.value }))}
+            placeholder="Description"
+            className={`rounded-lg border px-3 py-2 text-sm outline-none ${isDark ? "border-gray-700 bg-[#1d2230]" : "border-gray-300 bg-white"}`}
+          />
+          <input
+            title="From date"
+            aria-label="From date"
+            type="date"
+            value={form.fromDate}
+            onChange={(e) => setForm((prev) => ({ ...prev, fromDate: e.target.value }))}
+            className={`rounded-lg border px-3 py-2 text-sm outline-none ${isDark ? "border-gray-700 bg-[#1d2230]" : "border-gray-300 bg-white"}`}
+          />
+          <input
+            title="To date"
+            aria-label="To date"
+            type="date"
+            value={form.toDate}
+            onChange={(e) => setForm((prev) => ({ ...prev, toDate: e.target.value }))}
+            className={`rounded-lg border px-3 py-2 text-sm outline-none ${isDark ? "border-gray-700 bg-[#1d2230]" : "border-gray-300 bg-white"}`}
+          />
         </div>
 
-        {/* Cards */}
-        <div style={{ flex:1, overflowY:"auto", padding:"0 12px", minHeight:80 }}>
-          <div style={{ display:"flex", flexDirection:"column", gap:10, paddingBottom:8 }}>
-            {colTasks.map((t) => (
-              <StatusCard key={t.id} task={t} statusCol={col}/>
-            ))}
-            {over && (
-              <div style={{
-                height:52, borderRadius:12,
-                border:"2px dashed rgba(59,130,246,0.3)",
-                background:"rgba(59,130,246,0.04)",
-              }}/>
-            )}
-          </div>
+        <div className="mt-4 space-y-3">
+          {form.milestones.map((milestone, milestoneIndex) => (
+            <div key={milestoneIndex} className={`rounded-xl border p-3 ${isDark ? "border-gray-700 bg-[#11151f]" : "border-gray-200 bg-gray-50"}`}>
+              <input
+                title="Milestone title"
+                aria-label="Milestone title"
+                value={milestone.title}
+                onChange={(e) => updateMilestoneTitle(milestoneIndex, e.target.value)}
+                placeholder="Milestone"
+                className={`mb-2 w-full rounded-lg border px-3 py-2 text-sm outline-none ${isDark ? "border-gray-700 bg-[#1d2230]" : "border-gray-300 bg-white"}`}
+              />
+
+              <div className="space-y-2">
+                {milestone.points.map((point, pointIndex) => (
+                  <div key={pointIndex} className="flex items-center gap-2">
+                    <input
+                      title="Point completed"
+                      aria-label="Point completed"
+                      type="checkbox"
+                      checked={point.done}
+                      onChange={(e) => updatePointDone(milestoneIndex, pointIndex, e.target.checked)}
+                    />
+                    <input
+                      title="Point text"
+                      aria-label="Point text"
+                      value={point.text}
+                      onChange={(e) => updatePointText(milestoneIndex, pointIndex, e.target.value)}
+                      placeholder="Point"
+                      className={`w-full rounded-lg border px-3 py-2 text-sm outline-none ${isDark ? "border-gray-700 bg-[#1d2230]" : "border-gray-300 bg-white"}`}
+                    />
+                  </div>
+                ))}
+              </div>
+
+              <button
+                onClick={() => setForm((prev) => {
+                  const milestones = [...prev.milestones];
+                  const points = [...milestones[milestoneIndex].points, { text: "", done: false }];
+                  milestones[milestoneIndex] = { ...milestones[milestoneIndex], points };
+                  return { ...prev, milestones };
+                })}
+                className={`mt-2 text-xs ${isDark ? "text-blue-300" : "text-blue-600"}`}
+              >
+                + Add Point
+              </button>
+            </div>
+          ))}
         </div>
 
-        {/* Add button */}
-        <div style={{ padding:"6px 12px 12px" }}>
-          <button style={{
-            width:"100%", display:"flex", alignItems:"center", gap:8,
-            padding:"9px 14px", borderRadius:12, fontSize:12, fontWeight:700,
-            border:`1.5px dashed ${isDark?"rgba(255,255,255,0.08)":"rgba(0,0,0,0.1)"}`,
-            background:"none", cursor:"pointer",
-            color: isDark?"#374151":"#d1d5db",
-            transition:"all 0.15s",
-          }}
-          onMouseEnter={(e)=>{
-            (e.currentTarget as HTMLElement).style.color = col.dot;
-            (e.currentTarget as HTMLElement).style.borderColor = col.dot;
-          }}
-          onMouseLeave={(e)=>{
-            (e.currentTarget as HTMLElement).style.color = isDark?"#374151":"#d1d5db";
-            (e.currentTarget as HTMLElement).style.borderColor = isDark?"rgba(255,255,255,0.08)":"rgba(0,0,0,0.1)";
-          }}
+        <button
+          onClick={() => setForm((prev) => ({ ...prev, milestones: [...prev.milestones, { title: "", points: [] }] }))}
+          className={`mt-3 rounded-lg px-3 py-2 text-sm ${isDark ? "bg-gray-700 hover:bg-gray-600" : "bg-gray-100 hover:bg-gray-200"}`}
+        >
+          + Add Milestone
+        </button>
+
+        <div className="mt-5 flex justify-end gap-2">
+          <button
+            onClick={onClose}
+            className={`rounded-lg px-4 py-2 text-sm ${isDark ? "bg-gray-700 hover:bg-gray-600" : "bg-gray-100 hover:bg-gray-200"}`}
           >
-            <Plus size={13}/>
-            Add task
+            Cancel
+          </button>
+          <button
+            disabled={isSaving || !form.title.trim()}
+            onClick={() => onSave(form)}
+            className="rounded-lg bg-teal-600 px-4 py-2 text-sm text-white hover:bg-teal-500 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {isSaving ? "Saving..." : "Save"}
           </button>
         </div>
       </div>
-    );
-  }
-
-  return (
-    <div style={{ display:"flex", gap:14, overflowX:"auto", alignItems:"flex-start", paddingBottom:12 }}>
-      {STATUS_COLS.map((col) => (
-        <StatusColumn key={col.id} col={col}/>
-      ))}
     </div>
   );
 }
 
-/* ══════════════════════════════════════════════════════════════
-   ALL TASKS — draggable Kanban (original)
-══════════════════════════════════════════════════════════════ */
-function KanbanTask({ task, isDark, getTagColor }: { task:Task; isDark:boolean; getTagColor:(c:string)=>string }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: task.id });
+function KanbanTask({
+  task,
+  isDark,
+  getTagColor,
+  onTogglePoint,
+  viewMode,
+}: {
+  task: Task;
+  isDark: boolean;
+  getTagColor: (c: string) => string;
+  onTogglePoint?: (task: Task, milestoneIndex: number, pointIndex: number) => void;
+  viewMode: "all" | "status";
+}) {
+  const { attributes, listeners, setNodeRef, isDragging } = useSortable({ id: task.id });
+  const isDoneTask = task.status === "Done";
+  const stats = getMilestonePointStats(task.milestones);
+  const progress = getMilestoneProgress(task.milestones, task.progress || 0);
+  const isStatusMode = viewMode === "status";
+
   return (
     <div
       ref={setNodeRef}
-      style={{ transform:CSS.Transform.toString(transform), transition, zIndex:isDragging?10:"auto", opacity:isDragging?0.5:1 }}
-      {...attributes} {...listeners}
-      className={`p-4 rounded-xl border transition-all hover:shadow-md cursor-grab ${
-        isDark ? "bg-[#1F2125] border-gray-800 hover:border-gray-700" : "bg-white border-rose-100 hover:border-rose-200"
-      }`}
+      {...attributes}
+      {...listeners}
+      className={`cursor-grab rounded-xl border p-4 transition-all hover:shadow-md ${isDragging ? "opacity-50" : "opacity-100"} ${isDark ? "border-gray-800 bg-[#1F2125] hover:border-gray-700" : "border-rose-100 bg-white hover:border-rose-200"}`}
     >
-      <h3 className={`font-medium text-sm mb-3 leading-snug ${isDark?"text-gray-200":"text-gray-800"}`}>{task.title}</h3>
-      <div className="flex flex-wrap gap-2 mb-4">
-        {task.tags.map((tag,i) => (
-          <span key={i} className={`text-[10px] font-semibold px-2.5 py-1 rounded-full ${getTagColor(tag.color)}`}>{tag.label}</span>
-        ))}
-      </div>
-      <div className="flex items-center justify-between mt-auto">
-        <div className={`flex items-center gap-1.5 text-[10px] ${isDark?"text-gray-500":"text-gray-500"}`}>
-          <CalendarIcon size={12}/><span>{task.date}</span>
-        </div>
-        <div className="flex -space-x-1.5">
-          {task.avatars.map((cls,i) => (
-            <div key={i} className={`w-5 h-5 rounded-full border-2 ${cls} ${isDark?"border-[#1F2125]":"border-white"}`}/>
+      <h3 className={`mb-2 text-sm font-medium leading-snug ${isDark ? "text-gray-200" : "text-gray-800"}`}>{task.title}</h3>
+      {!isStatusMode && task.description && <p className={`mb-3 text-xs ${isDark ? "text-gray-400" : "text-gray-600"}`}>{task.description}</p>}
+
+      {!isStatusMode && (
+        <div className="mb-3 flex flex-wrap gap-2">
+          {task.tags.map((tag, i) => (
+            <span key={i} className={`rounded-full px-2.5 py-1 text-[10px] font-semibold ${getTagColor(tag.color)}`}>{tag.label}</span>
           ))}
         </div>
-      </div>
+      )}
+
+      {isStatusMode && (
+        <div className="mb-3">
+          <div className="mb-1 flex items-center justify-between">
+            <span className={`text-[10px] ${isDark ? "text-gray-400" : "text-gray-600"}`}>
+              Progress {stats.total > 0 ? `(${stats.done}/${stats.total})` : ""}
+            </span>
+            <span className={`text-[10px] font-semibold ${isDark ? "text-gray-300" : "text-gray-700"}`}>{progress}%</span>
+          </div>
+          <progress
+            className="h-1.5 w-full overflow-hidden rounded-full [&::-webkit-progress-bar]:bg-gray-200 [&::-webkit-progress-value]:bg-teal-500 dark:[&::-webkit-progress-bar]:bg-gray-700 dark:[&::-webkit-progress-value]:bg-teal-500"
+            value={progress}
+            max={100}
+          />
+        </div>
+      )}
+
+      {!isStatusMode && task.milestones && task.milestones.length > 0 && (
+        <div className="mb-3 space-y-2">
+          {task.milestones.map((milestone, milestoneIndex) => (
+            <div key={`${task.id}-m-${milestoneIndex}`} className={`rounded-lg border p-2 ${isDark ? "border-gray-700 bg-black/20" : "border-gray-200 bg-gray-50"}`}>
+              <p className={`mb-1 text-[11px] font-semibold ${isDark ? "text-gray-300" : "text-gray-700"}`}>{milestone.title || "Milestone"}</p>
+              <div className="space-y-1">
+                {milestone.points.map((point, pointIndex) => (
+                  <label key={`${task.id}-m-${milestoneIndex}-p-${pointIndex}`} className="flex items-center gap-2 text-[11px]">
+                    <input
+                      title="Mark point done"
+                      aria-label="Mark point done"
+                      type="checkbox"
+                      checked={point.done}
+                      disabled={isDoneTask}
+                      onPointerDown={(e) => e.stopPropagation()}
+                      onChange={() => {
+                        if (isDoneTask) return;
+                        onTogglePoint?.(task, milestoneIndex, pointIndex);
+                      }}
+                    />
+                    <span className={point.done ? "line-through opacity-70" : ""}>{point.text}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {!isStatusMode && (
+        <div className="mt-auto flex items-center justify-between">
+          <div className="flex items-center gap-1.5 text-[10px] text-gray-500">
+            <CalendarIcon size={12} />
+            <span>{task.date}</span>
+          </div>
+          <div className="flex -space-x-1.5">
+            {task.avatars.map((cls, i) => (
+              <div key={i} className={`h-5 w-5 rounded-full border-2 ${cls} ${isDark ? "border-[#1F2125]" : "border-white"}`} />
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
-function KanbanColumn({ column, isDark, getTagColor }: { column:Column; isDark:boolean; getTagColor:(c:string)=>string }) {
-  const { setNodeRef, isOver } = useSortable({ id:column.id, data:{ type:"Column" } });
-  const taskIds = useMemo(() => column.tasks.map((t)=>t.id), [column.tasks]);
+function KanbanColumn({
+  column,
+  isDark,
+  getTagColor,
+  onAddNew,
+  onTogglePoint,
+  viewMode,
+}: {
+  column: Column;
+  isDark: boolean;
+  getTagColor: (c: string) => string;
+  onAddNew: (columnId: string) => void;
+  onTogglePoint?: (task: Task, milestoneIndex: number, pointIndex: number) => void;
+  viewMode: "all" | "status";
+}) {
+  const { setNodeRef, isOver } = useSortable({ id: column.id, data: { type: "Column" } });
+  const taskIds = useMemo(() => column.tasks.map((t) => t.id), [column.tasks]);
+
   return (
-    <div ref={setNodeRef} className="w-80 flex-shrink-0">
-      <div className="flex items-center justify-between mb-4">
+    <div ref={setNodeRef} className="w-80 shrink-0">
+      <div className="mb-4 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <span className={`font-bold ${isDark?"text-gray-200":"text-gray-900"}`}>{column.title}</span>
-          <span className={`text-xs px-2 py-0.5 rounded-full ${isDark?"bg-gray-800 text-gray-400":"bg-gray-200 text-gray-600"}`}>{column.tasks.length}</span>
+          <span className={`font-bold ${isDark ? "text-gray-200" : "text-gray-900"}`}>{column.title}</span>
+          <span className={`rounded-full px-2 py-0.5 text-xs ${isDark ? "bg-gray-800 text-gray-400" : "bg-gray-200 text-gray-600"}`}>{column.tasks.length}</span>
         </div>
         <div className="flex items-center gap-1">
-          <button className={`p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-800 ${isDark?"text-gray-400":"text-gray-500"}`}><Plus size={16}/></button>
-          <button className={`p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-800 ${isDark?"text-gray-400":"text-gray-500"}`}><MoreHorizontal size={16}/></button>
+          <button title="Add" aria-label="Add" className={`rounded p-1 hover:bg-gray-200 dark:hover:bg-gray-800 ${isDark ? "text-gray-400" : "text-gray-500"}`}>
+            <Plus size={16} />
+          </button>
+          <button title="More options" aria-label="More options" className={`rounded p-1 hover:bg-gray-200 dark:hover:bg-gray-800 ${isDark ? "text-gray-400" : "text-gray-500"}`}>
+            <MoreHorizontal size={16} />
+          </button>
         </div>
       </div>
-      <div className={`space-y-3 p-1 rounded-xl ${isOver?(isDark?"bg-gray-800/50":"bg-rose-50"):""}`}>
+
+      <div className={`space-y-3 rounded-xl p-1 ${isOver ? (isDark ? "bg-gray-800/50" : "bg-rose-50") : ""}`}>
         <SortableContext items={taskIds} strategy={verticalListSortingStrategy}>
           {column.tasks.map((task) => (
-            <KanbanTask key={task.id} task={task} isDark={isDark} getTagColor={getTagColor}/>
+            <KanbanTask
+              key={task.id}
+              task={task}
+              isDark={isDark}
+              getTagColor={getTagColor}
+              onTogglePoint={onTogglePoint}
+              viewMode={viewMode}
+            />
           ))}
         </SortableContext>
-        <button className={`w-full py-2 rounded-xl border border-dashed flex items-center justify-center gap-2 text-xs transition-colors ${
-          isDark?"border-gray-800 text-gray-500 hover:bg-gray-800/50 hover:text-gray-300":"border-rose-200 text-gray-500 hover:bg-rose-50 hover:text-gray-700"
-        }`}>
-          <Plus size={14}/><span>Add New</span>
+
+        <button
+          onClick={() => onAddNew(String(column.id))}
+          className={`flex w-full items-center justify-center gap-2 rounded-xl border border-dashed py-2 text-xs transition-colors ${isDark ? "border-gray-800 text-gray-500 hover:bg-gray-800/50 hover:text-gray-300" : "border-rose-200 text-gray-500 hover:bg-rose-50 hover:text-gray-700"}`}
+        >
+          <Plus size={14} />
+          <span>Add New</span>
         </button>
       </div>
     </div>
   );
 }
 
-/* ══════════════════════════════════════════════════════════════
-   MY TASKS — filtered flat list
-══════════════════════════════════════════════════════════════ */
-function MyTasksList({ tasks, isDark }: { tasks: Task[]; isDark: boolean }) {
-  const mine = tasks.filter((t) => t.assignee === "me");
-  if (mine.length === 0) {
-    return (
-      <div className={`flex flex-col items-center justify-center py-16 text-sm ${isDark?"text-gray-600":"text-gray-400"}`}>
-        <span className="text-4xl mb-3 opacity-40">🎯</span>
-        <p>No tasks assigned to you.</p>
-      </div>
-    );
-  }
+function ByStatusBoard({
+  columns,
+  isDark,
+  getTagColor,
+  onAddNew,
+  onTogglePoint,
+}: {
+  columns: Column[];
+  isDark: boolean;
+  getTagColor: (c: string) => string;
+  onAddNew: (columnId: string) => void;
+  onTogglePoint?: (task: Task, milestoneIndex: number, pointIndex: number) => void;
+}) {
+  const allTasks = columns.flatMap((c) => c.tasks);
+  const totalProjects = allTasks.length;
+  const completedProjects = allTasks.filter((task) => getMilestoneProgress(task.milestones, task.progress || 0) >= 100).length;
+  const overallProgress = totalProjects > 0 ? Math.round((completedProjects / totalProjects) * 100) : 0;
+
   return (
-    <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
-      {mine.map((t) => {
-        const priority = t.priority || "Medium";
-        const priCls   = isDark ? PRI[priority]?.dark : PRI[priority]?.light;
-        const progress = t.progress ?? 0;
-        return (
-          <div key={t.id} style={{
-            background: isDark?"#1c1f28":"#ffffff",
-            border: `1px solid ${isDark?"rgba(255,255,255,0.07)":"rgba(0,0,0,0.06)"}`,
-            borderRadius:14, padding:"14px",
-          }}>
-            <p style={{ fontSize:13, fontWeight:600, color:isDark?"#f1f5f9":"#111827", marginBottom:10 }}>{t.title}</p>
-            <p style={{ fontSize:11, color:isDark?"#6b7280":"#9ca3af", marginBottom:6 }}>{progress}%</p>
-            <div style={{
-              width:"100%", height:6, borderRadius:999, marginBottom:10,
-              background: isDark?"rgba(255,255,255,0.08)":"#e5e7eb", overflow:"hidden",
-            }}>
-              <div style={{
-                height:"100%", borderRadius:999, width:`${progress}%`,
-                background:"linear-gradient(to right,#0d9488,#10b981)",
-                transition:"width 0.4s",
-              }}/>
-            </div>
-            <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between" }}>
-              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-md text-[11px] font-semibold ${priCls}`}>
-                {priority}
-              </span>
-              <span style={{ fontSize:11, color:isDark?"#6b7280":"#9ca3af" }}>{t.date}</span>
-            </div>
-          </div>
-        );
-      })}
+    <div className="p-4">
+      <div className={`mb-4 rounded-xl border p-4 ${isDark ? "border-gray-700 bg-[#151821]" : "border-gray-200 bg-white"}`}>
+        <div className="mb-2 flex items-center justify-between">
+          <p className={`text-sm font-semibold ${isDark ? "text-gray-100" : "text-gray-900"}`}>Project Completion</p>
+          <p className={`text-xs ${isDark ? "text-gray-300" : "text-gray-700"}`}>{completedProjects}/{totalProjects} completed</p>
+        </div>
+        <progress
+          className="h-2 w-full overflow-hidden rounded-full [&::-webkit-progress-bar]:bg-gray-200 [&::-webkit-progress-value]:bg-emerald-500 dark:[&::-webkit-progress-bar]:bg-gray-700 dark:[&::-webkit-progress-value]:bg-emerald-500"
+          value={overallProgress}
+          max={100}
+        />
+        <p className={`mt-1 text-[11px] ${isDark ? "text-gray-400" : "text-gray-600"}`}>{overallProgress}% based on completed projects</p>
+      </div>
+
+      <div className="flex gap-6 overflow-x-auto">
+        {columns.map((column) => (
+          <KanbanColumn
+            key={column.id}
+            column={column}
+            isDark={isDark}
+            getTagColor={getTagColor}
+            onAddNew={onAddNew}
+            onTogglePoint={onTogglePoint}
+            viewMode="status"
+          />
+        ))}
+      </div>
     </div>
   );
 }
 
-/* ══════════════════════════════════════════════════════════════
-   BoardView — main export
-══════════════════════════════════════════════════════════════ */
+function MyTasksList({ tasks, isDark }: { tasks: Task[]; isDark: boolean }) {
+  const mine = tasks.filter((t) => t.assignee === "me");
+
+  if (mine.length === 0) {
+    return (
+      <div className={`flex flex-col items-center justify-center py-16 text-sm ${isDark ? "text-gray-600" : "text-gray-400"}`}>
+        <p>No tasks assigned to you.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-3 p-4">
+      {mine.map((task) => (
+        <div key={task.id} className={`rounded-xl border p-4 ${isDark ? "border-gray-700 bg-[#1b1f2a]" : "border-gray-200 bg-white"}`}>
+          <p className="text-sm font-semibold">{task.title}</p>
+          <p className={`text-xs ${isDark ? "text-gray-400" : "text-gray-600"}`}>{task.date}</p>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function BoardView({
   databaseId,
-  activeViewId,
   activeView,
 }: {
   databaseId?: string;
-  activeViewId?: string;
   activeView?: DbView;
 }) {
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === "dark";
+
   const [columns, setColumns] = useState<Column[]>(INITIAL_COLUMNS);
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [isSavingTask, setIsSavingTask] = useState(false);
+  const [createStatus, setCreateStatus] = useState("To Do");
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
 
-  /* flat task list for all-tasks / my-tasks */
+  const baseColumns = useMemo(() => INITIAL_COLUMNS.map((col) => ({ ...col, tasks: [] as Task[] })), []);
+
+  const loadBoardItems = useCallback(async () => {
+    if (!databaseId) return;
+
+    try {
+      setLoadError(null);
+      const res = await fetch(`/api/board_items?databaseId=${databaseId}`);
+      if (!res.ok) throw new Error("Failed to load board items");
+
+      const items: DatabaseBoardItem[] = await res.json();
+      const nextColumns = baseColumns.map((col) => ({ ...col, tasks: [...col.tasks] }));
+
+      items.forEach((item) => {
+        const mapped = mapDatabaseItemToTask(item);
+        const status = mapped.status || "To Do";
+        const targetColumnId = STATUS_TO_COLUMN_ID[status] || "todo";
+        const targetColumn = nextColumns.find((col) => String(col.id) === targetColumnId);
+        if (targetColumn) targetColumn.tasks.push(mapped);
+      });
+
+      setColumns(nextColumns);
+    } catch (error) {
+      console.error(error);
+      setLoadError("Could not load board items");
+    }
+  }, [baseColumns, databaseId]);
+
+  useEffect(() => {
+    if (databaseId) {
+      loadBoardItems();
+    }
+  }, [databaseId, loadBoardItems]);
+
   const allTasks = useMemo(() => columns.flatMap((c) => c.tasks), [columns]);
-
-  /* ── determine which view to render ── */
   const viewType = activeView?.type || "all";
-
   const getTagColor = (color: string) => getTagCls(color, isDark);
 
-  /* ── drag handler for All Tasks kanban ── */
+  const openCreateForColumn = (columnId: string) => {
+    setCreateStatus(COLUMN_ID_TO_STATUS[columnId] || "To Do");
+    setIsCreateOpen(true);
+  };
+
+  const saveNewTask = async (form: TaskFormData) => {
+    const values = {
+      title: form.title,
+      description: form.description,
+      fromDate: form.fromDate,
+      toDate: form.toDate,
+      milestones: form.milestones,
+      Status: createStatus,
+      progress: 0,
+    };
+
+    setIsSavingTask(true);
+    try {
+      if (databaseId) {
+        const res = await fetch("/api/board_items", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ databaseId, values }),
+        });
+        if (!res.ok) throw new Error("Failed to save task");
+        await loadBoardItems();
+      } else {
+        const fallbackTask: Task = {
+          id: `${Date.now()}`,
+          title: values.title,
+          description: values.description,
+          fromDate: values.fromDate,
+          toDate: values.toDate,
+          milestones: values.milestones,
+          tags: [{ label: values.Status, color: "cyan" }],
+          date: formatDateRange(values.fromDate, values.toDate),
+          avatars: ["bg-teal-500"],
+          status: values.Status,
+          assignee: "me",
+          priority: "Medium",
+          progress: 0,
+        };
+
+        const targetColumnId = STATUS_TO_COLUMN_ID[createStatus] || "todo";
+        setColumns((prev) =>
+          prev.map((col) =>
+            String(col.id) === targetColumnId ? { ...col, tasks: [fallbackTask, ...col.tasks] } : col
+          )
+        );
+      }
+
+      setIsCreateOpen(false);
+    } finally {
+      setIsSavingTask(false);
+    }
+  };
+
+  const toggleMilestonePoint = async (task: Task, milestoneIndex: number, pointIndex: number) => {
+    const nextMilestones = (task.milestones || []).map((milestone, idx) => {
+      if (idx !== milestoneIndex) return milestone;
+
+      const points = milestone.points.map((point, pIdx) =>
+        pIdx === pointIndex ? { ...point, done: !point.done } : point
+      );
+
+      return { ...milestone, points };
+    });
+
+    const allDone =
+      nextMilestones.length > 0 &&
+      nextMilestones.every((milestone) => milestone.points.every((point) => point.done));
+    const nextProgress = getMilestoneProgress(nextMilestones, task.progress || 0);
+
+    const nextStatus = allDone ? "Done" : task.status || "In Progress";
+
+    const updatedTask: Task = {
+      ...task,
+      milestones: nextMilestones,
+      status: nextStatus,
+      tags: [{ label: nextStatus, color: "cyan" }],
+      progress: nextProgress,
+    };
+
+    setColumns((prev) => {
+      const withoutTask = prev.map((col) => ({ ...col, tasks: col.tasks.filter((t) => t.id !== task.id) }));
+      const targetColumnId = STATUS_TO_COLUMN_ID[nextStatus] || "todo";
+
+      return withoutTask.map((col) =>
+        String(col.id) === targetColumnId ? { ...col, tasks: [updatedTask, ...col.tasks] } : col
+      );
+    });
+
+    if (databaseId && task.dbId) {
+      const values = {
+        title: task.title,
+        description: task.description || "",
+        fromDate: task.fromDate || "",
+        toDate: task.toDate || "",
+        milestones: nextMilestones,
+        Status: nextStatus,
+        progress: nextProgress,
+      };
+
+      const res = await fetch(`/api/board_items/${task.dbId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ values }),
+      });
+
+      if (!res.ok) {
+        await loadBoardItems();
+      }
+    }
+  };
+
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
     if (!over) return;
+
     const activeCol = findCol(columns, active.id);
-    const overCol   = findCol(columns, over.id);
+    const overCol = findCol(columns, over.id);
     if (!activeCol || !overCol) return;
-    const isSame    = activeCol.id === overCol.id;
+
+    const isSame = activeCol.id === overCol.id;
     const activeIdx = activeCol.tasks.findIndex((t) => t.id === active.id);
-    let   overIdx   = overCol.tasks.findIndex((t) => t.id === over.id);
+    let overIdx = overCol.tasks.findIndex((t) => t.id === over.id);
     if (overIdx === -1) overIdx = overCol.tasks.length;
 
     if (isSame && activeIdx !== overIdx) {
-      setColumns((prev) => prev.map((col) =>
-        col.id === activeCol.id ? { ...col, tasks: arrayMove(activeCol.tasks, activeIdx, overIdx) } : col
-      ));
-    } else if (!isSame) {
+      setColumns((prev) =>
+        prev.map((col) =>
+          col.id === activeCol.id
+            ? { ...col, tasks: arrayMove(activeCol.tasks, activeIdx, overIdx) }
+            : col
+        )
+      );
+      return;
+    }
+
+    if (!isSame) {
       const task = activeCol.tasks[activeIdx];
-      setColumns((prev) => prev.map((col) => {
-        if (col.id === activeCol.id) return { ...col, tasks: col.tasks.filter((t) => t.id !== active.id) };
-        if (col.id === overCol.id) {
-          const next = [...col.tasks];
-          next.splice(overIdx, 0, task);
-          return { ...col, tasks: next };
-        }
-        return col;
-      }));
+      setColumns((prev) =>
+        prev.map((col) => {
+          if (col.id === activeCol.id) {
+            return { ...col, tasks: col.tasks.filter((t) => t.id !== active.id) };
+          }
+          if (col.id === overCol.id) {
+            const next = [...col.tasks];
+            next.splice(overIdx, 0, task);
+            return { ...col, tasks: next };
+          }
+          return col;
+        })
+      );
     }
   };
 
   const colIds = useMemo(() => columns.map((c) => c.id), [columns]);
 
-  /* ══════ RENDER based on active view ══════ */
+  if (viewType === "my-tasks") {
+    return <MyTasksList tasks={allTasks} isDark={isDark} />;
+  }
 
-  /* ── By Status → Kanban with progress cards ── */
   if (viewType === "by-status") {
     return (
-      <div className="p-4">
-        <ByStatusKanban isDark={isDark} tasks={allTasks}/>
-      </div>
+      <>
+        <ByStatusBoard
+          columns={columns}
+          isDark={isDark}
+          getTagColor={getTagColor}
+          onAddNew={openCreateForColumn}
+          onTogglePoint={toggleMilestonePoint}
+        />
+        {loadError && <p className="px-4 pb-2 text-sm text-red-500">{loadError}</p>}
+        <CreateTaskModal
+          key={`${isCreateOpen}-${createStatus}`}
+          isOpen={isCreateOpen}
+          isDark={isDark}
+          isSaving={isSavingTask}
+          defaultStatus={createStatus}
+          onClose={() => setIsCreateOpen(false)}
+          onSave={saveNewTask}
+        />
+      </>
     );
   }
 
-  /* ── My Tasks → filtered list ── */
-  if (viewType === "my-tasks") {
-    return (
-      <div className="p-4">
-        <MyTasksList tasks={allTasks} isDark={isDark}/>
-      </div>
-    );
-  }
-
-  /* ── All Tasks → original draggable kanban ── */
   return (
-    <DndContext sensors={sensors} collisionDetection={closestCorners} onDragEnd={handleDragEnd}>
-      <div className="flex-1 overflow-x-auto p-6">
-        <div className="flex gap-6 min-w-max">
-          <SortableContext items={colIds} strategy={verticalListSortingStrategy}>
-            {columns.map((column) => (
-              <KanbanColumn key={column.id} column={column} isDark={isDark} getTagColor={getTagColor}/>
-            ))}
-          </SortableContext>
+    <>
+      <DndContext sensors={sensors} collisionDetection={closestCorners} onDragEnd={handleDragEnd}>
+        <div className="flex-1 overflow-x-auto p-6">
+          <div className="flex gap-6 min-w-max">
+            <SortableContext items={colIds} strategy={verticalListSortingStrategy}>
+              {columns.map((column) => (
+                <KanbanColumn
+                  key={column.id}
+                  column={column}
+                  isDark={isDark}
+                  getTagColor={getTagColor}
+                  onAddNew={openCreateForColumn}
+                  onTogglePoint={toggleMilestonePoint}
+                  viewMode="all"
+                />
+              ))}
+            </SortableContext>
+          </div>
+          {loadError && <p className="mt-4 text-sm text-red-500">{loadError}</p>}
         </div>
-      </div>
-    </DndContext>
+      </DndContext>
+
+      <CreateTaskModal
+        key={`${isCreateOpen}-${createStatus}`}
+        isOpen={isCreateOpen}
+        isDark={isDark}
+        isSaving={isSavingTask}
+        defaultStatus={createStatus}
+        onClose={() => setIsCreateOpen(false)}
+        onSave={saveNewTask}
+      />
+    </>
   );
 }

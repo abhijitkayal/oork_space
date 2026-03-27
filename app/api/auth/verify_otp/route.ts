@@ -38,6 +38,10 @@ export async function POST(req: Request) {
 
     // check OTP
     if (user.otp !== otp) {
+      console.log("Invalid OTP attempt for email:", otp);
+      console.log("Invalid OTP attempt for email:", user.otp);
+      console.log("Invalid OTP attempt for email:", email);
+
       return NextResponse.json(
         { error: "Invalid OTP" },
         { status: 400 }
@@ -70,6 +74,7 @@ export async function POST(req: Request) {
       message: "Email verified successfully",
       user: {
         id: user._id,
+        name: user.name,
         email: user.email,
       },
     });

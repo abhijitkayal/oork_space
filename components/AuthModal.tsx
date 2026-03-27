@@ -107,8 +107,13 @@ export default function AuthModal({ isOpen, onClose, initialMode = "sign-in" }: 
       setSiSuccess(true);
       setTimeout(() => { 
         setSiSuccess(false); 
-        login({ id: data.user?.id || "1", email: signIn.email });
-        onClose(); 
+        const userId = data.user?.id ? String(data.user.id) : "";
+        login({ id: userId, email: data.user?.email || signIn.email, name: data.user?.name });
+        if (userId) {
+          router.push(`/${userId}`);
+          return;
+        }
+        onClose();
       }, 1800);
     } catch (err: any) {
       setError(err.message);
@@ -176,8 +181,13 @@ export default function AuthModal({ isOpen, onClose, initialMode = "sign-in" }: 
       if (!res.ok) throw new Error(data.error || "Verification failed");
 
       // Success - login and redirect
-      login({ id: data.user?.id || "1", email: emailToVerify });
-      router.push("/");
+      const userId = data.user?.id ? String(data.user.id) : "";
+      login({ id: userId, email: data.user?.email || emailToVerify, name: data.user?.name });
+      if (userId) {
+        router.push(`/${userId}`);
+      } else {
+        router.push("/");
+      }
     } catch (err: unknown) {
       const error = err as Error;
       setOtpError(error.message);

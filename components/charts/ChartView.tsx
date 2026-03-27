@@ -501,10 +501,10 @@ export default function ChartView({
 
   return (
     // ✅ FIX: root div must be `overflow-hidden` so no child can paint outside it.
-    <div className="flex flex-col h-full bg-gray-950 text-white overflow-hidden rounded-xl">
+    <div className="flex flex-col h-full bg-transparent text-white overflow-hidden rounded-xl">
 
       {/* ══ TOP BAR ══ */}
-      <div className="flex items-center gap-2 px-3 py-2 bg-gray-900 border-b border-gray-800 shrink-0">
+      <div className="flex items-center gap-2 px-3 py-2 bg-transparent border-b border-gray-800 shrink-0">
         <input value={config.title} onChange={e => updCfg("title", e.target.value)}
           className="flex-1 min-w-0 bg-transparent text-sm font-semibold text-white outline-none border-b border-transparent hover:border-gray-600 focus:border-blue-500 px-1 py-0.5 transition" />
 

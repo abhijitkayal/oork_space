@@ -1,7 +1,7 @@
 // app/api/databases/[id]/settings/route.ts
 import { NextResponse } from "next/server";
-import dbConnect from "@/lib/dbConnect";
-import Database from "@/lib/models/Database";
+import dbConnect from "../../../../../lib/dbConnect";
+import Database from "../../../../../lib/models/Database";
 
 /**
  * PATCH /api/databases/:id/settings
@@ -11,10 +11,11 @@ import Database from "@/lib/models/Database";
  */
 export async function PATCH(
   req: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     await dbConnect();
+    const { id } = await params;
     const body = await req.json();
 
     // Only allow specific setting keys — guard against overwriting core fields
@@ -32,7 +33,7 @@ export async function PATCH(
     }
 
     const db = await Database.findByIdAndUpdate(
-      params.id,
+      id,
       { $set: patch },
       { new: true }
     );
@@ -58,11 +59,12 @@ export async function PATCH(
  */
 export async function GET(
   _req: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     await dbConnect();
-    const db = await Database.findById(params.id).select("settings").lean();
+    const { id } = await params;
+    const db = await Database.findById(id).select("settings").lean();
     if (!db) return NextResponse.json({ error: "Not found" }, { status: 404 });
     return NextResponse.json((db as any).settings ?? {});
   } catch (err) {

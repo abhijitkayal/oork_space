@@ -94,8 +94,6 @@ export default function Header({
 
   const [showSharePopover, setShowSharePopover] = useState(false);
 
-  const PAGE_ID = "123"; // 🔥 replace with dynamic value
-
   return (
     <div
       className={`px-6 py-4 border-b ${
