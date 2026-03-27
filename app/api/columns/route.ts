@@ -16,13 +16,21 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   await connectDB();
   const body = await req.json();
+  const { databaseId, name, type, options, order } = body;
+
+  if (!databaseId) {
+    return NextResponse.json(
+      { message: "databaseId is required" },
+      { status: 400 }
+    );
+  }
 
   const col = await DatabaseColumn.create({
-    databaseId: body.databaseId,
-    name: body.name || "New column",
-    type: body.type || "text",
-    options: body.options || [],
-    order: body.order || 0,
+    databaseId,
+    name: name || "New column",
+    type: type || "text",
+    options: options || [],
+    order: Number.isFinite(order) ? order : 0,
   });
 
   return NextResponse.json(col);

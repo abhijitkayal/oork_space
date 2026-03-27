@@ -27,15 +27,23 @@ export type Column = {
 export type Row = {
   _id: string;
   databaseId: string;
-  cells: Record<string, any>;
+  cells: Record<string, unknown>;
   createdAt: string;
   updatedAt: string;
+};
+
+type CellValue = string | number | boolean | string[] | null;
+
+type ApiError = {
+  message?: string;
 };
 
 type Store = {
   columns: Column[];
   rows: Row[];
   formulaColumn: Column | null;
+  isLoading: boolean;
+  error: string | null;
 
   fetchColumns: (databaseId: string) => Promise<void>;
   fetchRows: (databaseId: string) => Promise<void>;
@@ -43,140 +51,105 @@ type Store = {
   addColumn: (databaseId: string) => Promise<void>;
   addRow: (databaseId: string) => Promise<void>;
 
-  updateCell: (rowId: string, columnId: string, value: any) => Promise<void>;
+  updateCell: (rowId: string, columnId: string, value: CellValue) => Promise<void>;
   setFormulaColumn: (column: Column | null) => void;
   updateColumn: (columnId: string, updates: Partial<Column>) => Promise<void>;
 };
 
+async function parseJsonSafe<T>(res: Response): Promise<T | null> {
+  try {
+    return (await res.json()) as T;
+  } catch {
+    return null;
+  }
+}
+
+function resolveErrorMessage(fallback: string, payload: ApiError | null): string {
+  if (payload?.message && payload.message.trim()) {
+    return payload.message;
+  }
+  return fallback;
+}
 
 export const useTableStore = create<Store>((set, get) => ({
   columns: [],
   rows: [],
   formulaColumn: null,
+  isLoading: false,
+  error: null,
 
   fetchColumns: async (databaseId) => {
-    const res = await fetch(`/api/columns?databaseId=${databaseId}`);
-    const data = await res.json();
-    
-    // If no columns exist, create dummy columns
-    if (data.length === 0) {
-      const dummyColumns = [
-        { name: "Name", type: "text", order: 0 },
-        { name: "Status", type: "select", order: 1, options: [
-          { label: "Not Started", color: "gray" },
-          { label: "In Progress", color: "blue" },
-          { label: "Completed", color: "green" }
-        ]},
-        { name: "Priority", type: "select", order: 2, options: [
-          { label: "Low", color: "blue" },
-          { label: "Medium", color: "yellow" },
-          { label: "High", color: "red" }
-        ]},
-        { name: "Due Date", type: "date", order: 3 },
-        { name: "Assignee", type: "person", order: 4 }
-      ];
-      
-      const createdColumns = [];
-      for (const col of dummyColumns) {
-        const response = await fetch(`/api/columns`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ databaseId, ...col }),
-        });
-        const created = await response.json();
-        createdColumns.push(created);
+    if (!databaseId) {
+      set({ columns: [] });
+      return;
+    }
+
+    set({ isLoading: true, error: null });
+
+    try {
+      const res = await fetch(`/api/columns?databaseId=${databaseId}`, {
+        cache: "no-store",
+      });
+      const data = await parseJsonSafe<Column[] | ApiError>(res);
+
+      if (!res.ok) {
+        throw new Error(resolveErrorMessage("Failed to fetch columns", (data as ApiError) ?? null));
       }
-      set({ columns: createdColumns });
-    } else {
-      set({ columns: data });
+
+      const list = Array.isArray(data) ? (data as Column[]) : [];
+      const sorted = [...list].sort((a, b) => a.order - b.order);
+      set({ columns: sorted, isLoading: false, error: null });
+    } catch (error) {
+      set({ isLoading: false, error: (error as Error).message, columns: [] });
     }
   },
 
   fetchRows: async (databaseId) => {
-    const res = await fetch(`/api/rows?databaseId=${databaseId}`);
-    const data = await res.json();
-    
-    // If no rows exist, create dummy rows
-    if (data.length === 0) {
-      const columns = get().columns;
-      if (columns.length > 0) {
-        const dummyRowsData = [
-          { 
-            0: "Task 1",
-            1: "Not Started",
-            2: "Medium",
-            3: new Date().toISOString(),
-            4: "User 1"
-          },
-          { 
-            0: "Task 2",
-            1: "In Progress",
-            2: "High",
-            3: new Date(Date.now() + 86400000).toISOString(),
-            4: "User 2"
-          },
-          { 
-            0: "Task 3",
-            1: "Completed",
-            2: "Low",
-            3: new Date(Date.now() + 172800000).toISOString(),
-            4: "User 3"
-          }
-        ];
-        
-        const createdRows = [];
-        for (const rowData of dummyRowsData) {
-          const cells: Record<string, any> = {};
-          columns.forEach((col, index) => {
-            if (rowData[index as keyof typeof rowData] !== undefined) {
-              cells[col._id] = rowData[index as keyof typeof rowData];
-            }
-          });
-          
-          const response = await fetch(`/api/rows`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ databaseId }),
-          });
-          const created = await response.json();
-          
-          // Update cells for the created row
-          for (const [columnId, value] of Object.entries(cells)) {
-            await fetch(`/api/cell`, {
-              method: "PATCH",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ rowId: created._id, columnId, value }),
-            });
-          }
-          
-          created.cells = cells;
-          createdRows.push(created);
-        }
-        set({ rows: createdRows });
-      } else {
-        set({ rows: data });
+    if (!databaseId) {
+      set({ rows: [] });
+      return;
+    }
+
+    set({ isLoading: true, error: null });
+
+    try {
+      const res = await fetch(`/api/rows?databaseId=${databaseId}`, {
+        cache: "no-store",
+      });
+      const data = await parseJsonSafe<Row[] | ApiError>(res);
+
+      if (!res.ok) {
+        throw new Error(resolveErrorMessage("Failed to fetch rows", (data as ApiError) ?? null));
       }
-    } else {
-      set({ rows: data });
+
+      set({ rows: Array.isArray(data) ? (data as Row[]) : [], isLoading: false, error: null });
+    } catch (error) {
+      set({ isLoading: false, error: (error as Error).message, rows: [] });
     }
   },
 
   addColumn: async (databaseId) => {
-    const order = get().columns.length;
-
+    const nextOrder = get().columns.length;
     const res = await fetch(`/api/columns`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         databaseId,
-        name: "Name",
+        name: "Column",
         type: "text",
-        order,
+        order: nextOrder,
       }),
     });
+    const payload = await parseJsonSafe<Column & ApiError>(res);
 
-    const created = await res.json();
-    set({ columns: [...get().columns, created] });
+    if (!res.ok || !payload || !("_id" in payload)) {
+      throw new Error(resolveErrorMessage("Failed to create column", payload));
+    }
+
+    set({
+      columns: [...get().columns, payload].sort((a, b) => a.order - b.order),
+      error: null,
+    });
   },
 
   addRow: async (databaseId) => {
@@ -185,26 +158,50 @@ export const useTableStore = create<Store>((set, get) => ({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ databaseId }),
     });
+    const payload = await parseJsonSafe<Row & ApiError>(res);
 
-    const created = await res.json();
-    set({ rows: [...get().rows, created] });
+    if (!res.ok || !payload || !("_id" in payload)) {
+      throw new Error(resolveErrorMessage("Failed to create row", payload));
+    }
+
+    set({ rows: [...get().rows, payload], error: null });
   },
 
   updateCell: async (rowId, columnId, value) => {
-    // optimistic update
+    const previousRows = get().rows;
+    const targetRow = previousRows.find((r) => r._id === rowId);
+
+    if (!targetRow) return;
+
     set({
-      rows: get().rows.map((r) =>
-        r._id === rowId
-          ? { ...r, cells: { ...r.cells, [columnId]: value } }
-          : r
+      rows: previousRows.map((row) =>
+        row._id === rowId
+          ? { ...row, cells: { ...row.cells, [columnId]: value } }
+          : row
       ),
+      error: null,
     });
 
-    await fetch(`/api/cell`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ rowId, columnId, value }),
-    });
+    try {
+      const res = await fetch(`/api/cell`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          rowId,
+          columnId,
+          value,
+          databaseId: targetRow.databaseId,
+        }),
+      });
+
+      const payload = await parseJsonSafe<ApiError>(res);
+      if (!res.ok) {
+        throw new Error(resolveErrorMessage("Failed to save cell value", payload));
+      }
+    } catch (error) {
+      set({ rows: previousRows, error: (error as Error).message });
+      throw error;
+    }
   },
 
   setFormulaColumn: (column) => {
@@ -212,15 +209,27 @@ export const useTableStore = create<Store>((set, get) => ({
   },
 
   updateColumn: async (columnId, updates) => {
-    const updatedColumns = get().columns.map((c) =>
-      c._id === columnId ? { ...c, ...updates } : c
+    const previousColumns = get().columns;
+    const nextColumns = previousColumns.map((col) =>
+      col._id === columnId ? { ...col, ...updates } : col
     );
-    set({ columns: updatedColumns });
 
-    await fetch(`/api/columns/${columnId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(updates),
-    });
+    set({ columns: nextColumns, error: null });
+
+    try {
+      const res = await fetch(`/api/columns/${columnId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updates),
+      });
+
+      const payload = await parseJsonSafe<ApiError>(res);
+      if (!res.ok) {
+        throw new Error(resolveErrorMessage("Failed to update column", payload));
+      }
+    } catch (error) {
+      set({ columns: previousColumns, error: (error as Error).message });
+      throw error;
+    }
   },
 }));

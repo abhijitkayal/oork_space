@@ -40,6 +40,7 @@ const BAR_GRAD: Record<string,string> = {
 /* ══════════════════════════════════════════════════════════════
    BY STATUS — progress cards kanban (matches screenshot)
 ══════════════════════════════════════════════════════════════ */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function ByStatusKanban({ tasks, properties, isDark, onOpenTask }: {
   tasks: Task[]; properties: Property[]; isDark: boolean;
   onOpenTask: (id: string) => void;
@@ -61,7 +62,7 @@ function ByStatusKanban({ tasks, properties, isDark, onOpenTask }: {
 
   /* progress: % of completed tasks in each status group — or read a progress value */
   const getProgress = (t: Task) => {
-    const v = t.values;
+    const v = t.values && typeof t.values === "object" ? t.values : {};
     /* look for a numeric progress field */
     for (const key of Object.keys(v)) {
       const val = v[key];
@@ -194,6 +195,7 @@ export default function TodoView({
 
   const [open,           setOpen]           = useState(false);
   const [selectedTaskId, setSelectedTaskId] = useState<string|null>(null);
+  const quickCreateBusyRef = useRef(false);
 
   /* ── Fetch ── */
   const fetchAll = useCallback(async () => {
@@ -256,6 +258,16 @@ export default function TodoView({
     setSelectedTaskId(created._id); setOpen(true);
   };
 
+  const handleQuickCreate = async () => {
+    if (quickCreateBusyRef.current) return;
+    quickCreateBusyRef.current = true;
+    try {
+      await createTask();
+    } finally {
+      quickCreateBusyRef.current = false;
+    }
+  };
+
   const toggleCompleted = async (task: Task) => {
     const newCompleted = !task.completed;
     setTasks((prev) => prev.map((t) => t._id===task._id ? {...t,completed:newCompleted} : t));
@@ -282,17 +294,32 @@ export default function TodoView({
   /* ── BY STATUS → progress kanban ── */
   if (activeView?.type === "by-status") {
     return (
-      <div className="p-3">
-        <ByStatusKanban
-          tasks={tasks}
+      <>
+        <div className="p-3 space-y-3">
+          <input
+            readOnly
+            value=""
+            placeholder="Create task..."
+            aria-label="Create task"
+            title="Create task"
+            onClick={handleQuickCreate}
+            className={`w-full rounded-lg border px-3 py-2 text-sm outline-none transition-colors ${
+              isDark
+                ? "border-gray-700 bg-[#111317] text-gray-200 placeholder:text-gray-400 hover:bg-[#1a1d23]"
+                : "border-gray-200 bg-white text-gray-900 placeholder:text-gray-500 hover:bg-gray-50"
+            }`}
+          />
+        </div>
+
+        <TodoTaskModal
+          isOpen={open}
+          onClose={() => setOpen(false)}
+          databaseId={databaseId}
+          taskId={selectedTaskId}
           properties={properties}
-          isDark={isDark}
-          onOpenTask={(id) => { setSelectedTaskId(id); setOpen(true); }}
+          onUpdated={fetchAll}
         />
-        <TodoTaskModal isOpen={open} onClose={()=>setOpen(false)}
-          databaseId={databaseId} taskId={selectedTaskId}
-          properties={properties} onUpdated={fetchAll}/>
-      </div>
+      </>
     );
   }
 

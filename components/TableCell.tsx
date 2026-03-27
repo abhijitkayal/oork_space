@@ -1,58 +1,97 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useTheme } from "next-themes";
 import { Column, Row, useTableStore } from "@/app/store/TableStore";
 import { evaluateFormula } from "@/lib/formula/EvaluteFormula";
 
-export default function TableCell({ row, col, isViewOnly = false }: { row: Row; col: Column; isViewOnly?: boolean }) {
+type TableCellProps = {
+  row: Row;
+  col: Column;
+  isViewOnly?: boolean;
+};
+
+function asStringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((item): item is string => typeof item === "string");
+}
+
+export default function TableCell({ row, col, isViewOnly = false }: TableCellProps) {
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === "dark";
 
-  const value = row.cells?.[col._id];
+  const rawValue = row.cells?.[col._id];
   const { updateCell, columns, setFormulaColumn } = useTableStore();
 
-  const [local, setLocal] = useState(value ?? "");
+  const [localValue, setLocalValue] = useState<string>(String(rawValue ?? ""));
 
   useEffect(() => {
-    if (value !== local) {
-      setLocal(value ?? "");
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [value]);
+    setLocalValue(String(rawValue ?? ""));
+  }, [rawValue]);
 
-  const save = async () => {
-    if (isViewOnly) return; // Block save in view-only mode
-    await updateCell(row._id, col._id, local);
+  const inputClass = `w-full bg-transparent outline-none text-sm ${
+    isDark ? "text-gray-200 placeholder-gray-600" : "text-gray-900 placeholder-gray-400"
+  } ${isViewOnly ? "cursor-not-allowed opacity-80" : ""}`;
+
+  const saveTextValue = async () => {
+    if (isViewOnly) return;
+    await updateCell(row._id, col._id, localValue);
   };
 
-  const inputClass = `w-full outline-none text-sm bg-transparent ${isDark ? "text-gray-200 placeholder-gray-600" : "text-gray-900 placeholder-gray-400"} ${isViewOnly ? "cursor-not-allowed" : ""}`;
+  const formulaValue = useMemo(() => {
+    if (col.type !== "formula") return "";
+    return col.formula ? evaluateFormula(col.formula, row, columns) : "";
+  }, [col, row, columns]);
 
-  // checkbox
+  if (col.type === "formula") {
+    const isError = String(formulaValue).startsWith("Error");
+    return (
+      <button
+        type="button"
+        onClick={() => {
+          if (!isViewOnly) setFormulaColumn(col);
+        }}
+        className={`w-full text-left px-3 py-2 text-sm ${
+          isError
+            ? "text-red-500"
+            : isDark
+              ? "text-gray-300 hover:bg-gray-800"
+              : "text-gray-700 hover:bg-gray-50"
+        } ${isViewOnly ? "cursor-default" : "cursor-pointer"}`}
+      >
+        {formulaValue === "" ? "-" : String(formulaValue)}
+      </button>
+    );
+  }
+
   if (col.type === "checkbox") {
     return (
       <div className="px-3 py-2">
         <input
           type="checkbox"
-          checked={!!value}
-          onChange={(e) => !isViewOnly && updateCell(row._id, col._id, e.target.checked)}
+          checked={Boolean(rawValue)}
+          onChange={(e) => {
+            if (isViewOnly) return;
+            void updateCell(row._id, col._id, e.target.checked);
+          }}
           disabled={isViewOnly}
-          className={`${isDark ? "accent-blue-500" : "accent-blue-600"} ${isViewOnly ? "cursor-not-allowed opacity-50" : ""}`}
+          className={isDark ? "accent-blue-500" : "accent-blue-600"}
           aria-label={col.name}
         />
       </div>
     );
   }
 
-  // date
   if (col.type === "date") {
     return (
       <div className="px-3 py-2">
         <input
           type="date"
-          value={local ? String(local).slice(0, 10) : ""}
-          onChange={(e) => setLocal(e.target.value)}
-          onBlur={save}
+          value={localValue ? localValue.slice(0, 10) : ""}
+          onChange={(e) => setLocalValue(e.target.value)}
+          onBlur={() => {
+            void saveTextValue();
+          }}
           disabled={isViewOnly}
           className={`${inputClass} ${isDark ? "color-scheme-dark" : ""}`}
           aria-label={col.name}
@@ -60,68 +99,19 @@ export default function TableCell({ row, col, isViewOnly = false }: { row: Row; 
       </div>
     );
   }
-  // email
-if (col.type === "email") {
 
-  const sendEmail = async (email: string) => {
-    if (isViewOnly) return; // Block email send in view-only mode
-    try {
-      await fetch("/api/send-email", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ email }),
-      });
-    } catch (err) {
-      console.error("Email send failed", err);
-    }
-  };
-
-  const handleBlur = async () => {
-    await save(); // save to DB
-
-    if (local && !isViewOnly) {
-      await sendEmail(local); // ✅ API CALL HERE
-    }
-  };
-
-  return (
-    <div className="px-3 py-2 space-y-1">
-      <input
-        type="email"
-        value={local}
-        onChange={(e) => setLocal(e.target.value)}
-        onBlur={handleBlur} // ✅ trigger here
-        placeholder="email@example.com"
-        disabled={isViewOnly}
-        className={inputClass}
-        aria-label={col.name}
-      />
-
-      {value && !isViewOnly && (
-        <button
-          onClick={() => sendEmail(value)}
-          className={`text-xs ${
-            isDark ? "text-blue-400" : "text-blue-600"
-          } hover:underline`}
-        >
-          Send Email →
-        </button>
-      )}
-    </div>
-  );
-}
-
-  // number
   if (col.type === "number") {
     return (
       <div className="px-3 py-2">
         <input
           type="number"
-          value={local}
-          onChange={(e) => setLocal(e.target.value)}
-          onBlur={save}
+          value={localValue}
+          onChange={(e) => setLocalValue(e.target.value)}
+          onBlur={() => {
+            if (isViewOnly) return;
+            const parsed = localValue === "" ? null : Number(localValue);
+            void updateCell(row._id, col._id, Number.isNaN(parsed) ? null : parsed);
+          }}
           disabled={isViewOnly}
           className={inputClass}
           aria-label={col.name}
@@ -130,24 +120,25 @@ if (col.type === "email") {
     );
   }
 
-  // select
   if (col.type === "select") {
     return (
       <div className="px-3 py-2">
         <select
-          value={local || ""}
+          value={localValue}
           onChange={(e) => {
+            setLocalValue(e.target.value);
             if (isViewOnly) return;
-            setLocal(e.target.value);
-            updateCell(row._id, col._id, e.target.value);
+            void updateCell(row._id, col._id, e.target.value);
           }}
           disabled={isViewOnly}
-          className={`w-full outline-none text-sm bg-transparent ${isDark ? "text-gray-200 bg-[#18191d]" : "text-gray-900 bg-white"} border ${isDark ? "border-gray-700" : "border-gray-300"} rounded px-2 py-1 ${isViewOnly ? "cursor-not-allowed opacity-50" : ""}`}
+          className={`w-full outline-none text-sm border rounded px-2 py-1 ${
+            isDark ? "text-gray-200 bg-[#18191d] border-gray-700" : "text-gray-900 bg-white border-gray-300"
+          }`}
           aria-label={col.name}
         >
           <option value="">Select...</option>
-          {col.options?.map((opt, idx) => (
-            <option key={idx} value={opt.label}>
+          {col.options?.map((opt) => (
+            <option key={`${col._id}-${opt.label}`} value={opt.label}>
               {opt.label}
             </option>
           ))}
@@ -156,56 +147,45 @@ if (col.type === "email") {
     );
   }
 
-  // multi_select
   if (col.type === "multi_select") {
-    const selectedValues = Array.isArray(value) ? value : [];
-    
-    const toggleOption = (option: string) => {
-      if (isViewOnly) return;
-      let newValues;
-      if (selectedValues.includes(option)) {
-        newValues = selectedValues.filter((v) => v !== option);
-      } else {
-        newValues = [...selectedValues, option];
-      }
-      updateCell(row._id, col._id, newValues);
-    };
+    const selected = asStringArray(rawValue);
 
     return (
-      <div className="px-3 py-2">
+      <div className="px-3 py-2 space-y-2">
         <div className="flex flex-wrap gap-1">
-          {selectedValues.map((val, idx) => (
+          {selected.map((item) => (
             <span
-              key={idx}
-              className={`inline-flex items-center px-2 py-1 text-xs rounded ${isDark ? "bg-blue-900 text-blue-200" : "bg-blue-100 text-blue-800"}`}
+              key={`${col._id}-${item}`}
+              className={`px-2 py-0.5 text-xs rounded ${
+                isDark ? "bg-blue-900 text-blue-100" : "bg-blue-100 text-blue-700"
+              }`}
             >
-              {val}
-              {!isViewOnly && (
-                <button
-                  onClick={() => toggleOption(val)}
-                  className="ml-1 hover:text-red-500"
-                  aria-label={`Remove ${val}`}
-                >
-                  ×
-                </button>
-              )}
+              {item}
             </span>
           ))}
         </div>
+
         {!isViewOnly && (
           <select
             onChange={(e) => {
-              if (e.target.value) {
-                toggleOption(e.target.value);
-                e.target.value = "";
-              }
+              const nextOption = e.target.value;
+              if (!nextOption) return;
+
+              const next = selected.includes(nextOption)
+                ? selected.filter((item) => item !== nextOption)
+                : [...selected, nextOption];
+
+              void updateCell(row._id, col._id, next);
+              e.target.value = "";
             }}
-            className={`w-full mt-1 outline-none text-sm ${isDark ? "text-gray-200 bg-[#18191d]" : "text-gray-900 bg-white"} border ${isDark ? "border-gray-700" : "border-gray-300"} rounded px-2 py-1`}
-            aria-label={`Add option to ${col.name}`}
+            className={`w-full outline-none text-sm border rounded px-2 py-1 ${
+              isDark ? "text-gray-200 bg-[#18191d] border-gray-700" : "text-gray-900 bg-white border-gray-300"
+            }`}
+            aria-label={col.name}
           >
-            <option value="">Add option...</option>
-            {col.options?.map((opt, idx) => (
-              <option key={idx} value={opt.label}>
+            <option value="">Toggle option...</option>
+            {col.options?.map((opt) => (
+              <option key={`${col._id}-ms-${opt.label}`} value={opt.label}>
                 {opt.label}
               </option>
             ))}
@@ -215,44 +195,65 @@ if (col.type === "email") {
     );
   }
 
-  // url
   if (col.type === "url") {
     return (
-      <div className="px-3 py-2">
+      <div className="px-3 py-2 space-y-1">
         <input
           type="url"
-          value={local}
-          onChange={(e) => setLocal(e.target.value)}
-          onBlur={save}
-          placeholder="https://..."
+          value={localValue}
+          onChange={(e) => setLocalValue(e.target.value)}
+          onBlur={() => {
+            void saveTextValue();
+          }}
           disabled={isViewOnly}
+          placeholder="https://"
           className={inputClass}
           aria-label={col.name}
         />
-        {value && (
+        {localValue && (
           <a
-            href={String(value)}
+            href={localValue}
             target="_blank"
-            rel="noopener noreferrer"
-            className={`text-xs ${isDark ? "text-blue-400" : "text-blue-600"} hover:underline`}
+            rel="noreferrer"
+            className={`text-xs ${isDark ? "text-blue-400" : "text-blue-600"}`}
           >
-            Open →
+            Open
           </a>
         )}
       </div>
     );
   }
 
-  // phone
+  if (col.type === "email") {
+    return (
+      <div className="px-3 py-2">
+        <input
+          type="email"
+          value={localValue}
+          onChange={(e) => setLocalValue(e.target.value)}
+          onBlur={() => {
+            void saveTextValue();
+          }}
+          placeholder="name@example.com"
+          disabled={isViewOnly}
+          className={inputClass}
+          aria-label={col.name}
+        />
+      </div>
+    );
+  }
+
   if (col.type === "phone") {
     return (
       <div className="px-3 py-2">
         <input
           type="tel"
-          value={local}
-          onChange={(e) => setLocal(e.target.value)}
-          onBlur={save}
-          placeholder="+1 (555) 123-4567"
+          value={localValue}
+          onChange={(e) => setLocalValue(e.target.value)}
+          onBlur={() => {
+            void saveTextValue();
+          }}
+          placeholder="+1 555 123 4567"
           disabled={isViewOnly}
           className={inputClass}
           aria-label={col.name}
@@ -261,63 +262,18 @@ if (col.type === "email") {
     );
   }
 
-  // person
-  if (col.type === "person") {
-    return (
-      <div className="px-3 py-2">
-        <input
-          value={local}
-          onChange={(e) => setLocal(e.target.value)}
-          onBlur={save}
-          placeholder="Person name"
-          disabled={isViewOnly}
-          className={inputClass}
-          aria-label={col.name}
-        />
-      </div>
-    );
-  }
-
-  // formula (read-only, clickable to edit)
-  if (col.type === "formula") {
-    const handleOpen = () => {
-      if (isViewOnly) return; // Don't open formula editor in view-only mode
-      setFormulaColumn(col);
-    };
-
-    const calculatedValue = col.formula
-      ? evaluateFormula(col.formula, row, columns)
-      : "";
-
-    const isError = String(calculatedValue).startsWith("Error");
-
-    return (
-      <div
-        onClick={handleOpen}
-        className={`px-3 py-2 text-sm ${
-          isViewOnly ? "cursor-default" : "cursor-pointer"
-        } ${
-          isError 
-            ? "text-red-500 hover:bg-red-50 dark:hover:bg-red-900/10"
-            : isDark ? "text-gray-400 hover:bg-gray-800" : "text-gray-600 hover:bg-gray-100"
-        }`}
-        title={isError ? (isViewOnly ? "Formula error" : "Click to edit formula") : String(calculatedValue)}
-      >
-        {calculatedValue === "" ? "—" : String(calculatedValue)}
-      </div>
-    );
-  }
-
-  // default text
   return (
     <div className="px-3 py-2">
       <input
-        value={local}
-        onChange={(e) => setLocal(e.target.value)}
-        onBlur={save}
+        type="text"
+        value={localValue}
+        onChange={(e) => setLocalValue(e.target.value)}
+        onBlur={() => {
+          void saveTextValue();
+        }}
         disabled={isViewOnly}
         className={inputClass}
-        placeholder="Enter text"
+        placeholder={col.type === "person" ? "Person name" : "Enter value"}
         aria-label={col.name}
       />
     </div>

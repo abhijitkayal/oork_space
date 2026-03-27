@@ -16,9 +16,17 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   await connectDB();
   const body = await req.json();
+  const { databaseId } = body;
+
+  if (!databaseId) {
+    return NextResponse.json(
+      { message: "databaseId is required" },
+      { status: 400 }
+    );
+  }
 
   const row = await DatabaseRow.create({
-    databaseId: body.databaseId,
+    databaseId,
     cells: {},
     createdBy: "system",
     updatedBy: "system",

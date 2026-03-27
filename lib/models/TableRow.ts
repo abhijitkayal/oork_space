@@ -17,4 +17,7 @@ const DatabaseRowSchema = new Schema(
   { timestamps: true }
 );
 
+// Table isolation: keep row queries and ordering scoped by table id.
+DatabaseRowSchema.index({ databaseId: 1, createdAt: 1 });
+
 export default models.DatabaseRow || model("DatabaseRow", DatabaseRowSchema);

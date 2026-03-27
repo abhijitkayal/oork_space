@@ -2,7 +2,7 @@
 
 import React from "react";
 import TimelineView from "./TimelineView";
-import TableView from "./view/TableView";
+// import TableView from "./view/TableView";
 import GalleryView from "./gallery/GalleryView";
 import BoardView from "./board/BoardView";
 import TodoView from "./todo/TodoView";
@@ -94,12 +94,7 @@ export default function DatabaseViewRenderer({
 
   if (db.viewType === "table") {
     return (
-      <TableView
-        databaseId={id}
-        isViewOnly={isViewOnly}
-        activeViewId={activeViewId}
-        activeView={activeView}
-      />
+      <div>it coming soon</div>
     );
   }
 
@@ -138,6 +133,7 @@ export default function DatabaseViewRenderer({
         databaseId={id}
         projectId={db.projectId}
         templateName={db.templateName}
+        activeView={activeView}
       />
     );
   }

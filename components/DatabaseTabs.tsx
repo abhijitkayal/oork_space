@@ -14,11 +14,26 @@ import type { Database } from "@/app/store/WorkspaceStore";
 
 /* ── Default views factory ── */
 function getDefaultViews(viewType: string): DbView[] {
-  if (["todo","board","table","timeline"].includes(viewType)) {
+  if (["todo","table","timeline"].includes(viewType)) {
     return [
-      { id:"all",       label:"All Tasks", icon:"star",   type:"all",       isDefault:true,  filters:[] },
-      { id:"by-status", label:"By Status", icon:"circle", type:"by-status", groupBy:"status",filters:[] },
-      { id:"my-tasks",  label:"My Tasks",  icon:"user",   type:"my-tasks",  filters:[{ field:"assignee",op:"eq",value:"me" }] },
+      { id:"all",       label:"visualization", icon:"star",   type:"all",       isDefault:true,  filters:[] },
+      // { id:"by-status", label:"input", icon:"circle", type:"by-status", groupBy:"status",filters:[] },
+      { id:"my-tasks",  label:"show data",  icon:"user",   type:"my-tasks",  filters:[{ field:"assignee",op:"eq",value:"me" }] },
+    ];
+  }
+    if (["charts"].includes(viewType)) {
+    return [
+      { id:"all",       label:"visualization", icon:"star",   type:"all",       isDefault:true,  filters:[] },
+      { id:"by-status", label:"input", icon:"circle", type:"by-status", groupBy:"status",filters:[] },
+      { id:"my-tasks",  label:"show data",  icon:"user",   type:"my-tasks",  filters:[{ field:"assignee",op:"eq",value:"me" }] },
+    ];
+  }
+   if (["board"].includes(viewType)) {
+    return [
+      { id:"all",       label:"visualization", icon:"star",   type:"all",       isDefault:true,  filters:[] },
+      { id:"by-status", label:"input", icon:"circle", type:"by-status", groupBy:"status",filters:[] },
+      { id:"my-tasks",  label:"show data",  icon:"user",   type:"my-tasks",  filters:[{ field:"assignee",op:"eq",value:"me" }] },
+      { id:"charts", label:"Charts", icon:"bar-chart-2", type:"charts", filters:[] },
     ];
   }
   if (["documentation","text","pagelink"].includes(viewType)) {
@@ -44,9 +59,11 @@ type SectionProps = {
   isDark:       boolean;
   isViewOnly:   boolean;
   onAddBelow:   (dbId: string) => void;
+  onArmDrag:    (dbId: string) => void;
   onDragStart:  (dbId: string) => void;
   onDropOn:     (targetDbId: string) => void;
   isDragging:   boolean;
+  isDragArmed:  boolean;
   dragEnabled:  boolean;
   onToggleDrag: () => void;
 };
@@ -54,8 +71,8 @@ type SectionProps = {
 function DraggableDatabaseSection({
   db, projectId,
   isDark, isViewOnly,
-  onAddBelow, onDragStart, onDropOn,
-  isDragging, dragEnabled, onToggleDrag,
+  onAddBelow, onArmDrag, onDragStart, onDropOn,
+  isDragging, isDragArmed, dragEnabled, onToggleDrag,
 }: SectionProps) {
 
   const rawViews: DbView[] = useMemo(
@@ -83,8 +100,8 @@ function DraggableDatabaseSection({
       └──────────────────────────────────────────────────────────┘
     */
     <section
-      draggable={dragEnabled}
-      onDragStart={dragEnabled ? () => onDragStart(db._id) : undefined}
+      draggable={dragEnabled && isDragArmed}
+      onDragStart={dragEnabled && isDragArmed ? () => onDragStart(db._id) : undefined}
       onDragOver={dragEnabled  ? (e) => e.preventDefault() : undefined}
       onDrop={dragEnabled      ? () => onDropOn(db._id) : undefined}
       id={`db-section-${db._id}`}
@@ -99,6 +116,7 @@ function DraggableDatabaseSection({
           : "text-gray-700 bg-gray-50 border-gray-200"
       }`}>
         <span
+          onClick={() => onArmDrag(db._id)}
           className={`p-1 rounded transition-colors ${
             dragEnabled
               ? isDark
@@ -108,7 +126,7 @@ function DraggableDatabaseSection({
               ? "cursor-grab text-gray-700"
               : "cursor-grab text-gray-300"
           }`}
-          title={dragEnabled ? "Drag to reorder" : "Enable drag mode to reorder"}
+          title={dragEnabled ? "Click to enable drag, then drag this section" : "Enable drag mode to reorder"}
         >
           <GripVertical size={14} />
         </span>
@@ -181,6 +199,7 @@ export default function DatabaseTabs({
   const [insertAfterDatabaseId, setInsertAfterDatabaseId] = useState<string | null>(null);
   const [orderedIds,            setOrderedIds]            = useState<string[]>([]);
   const [draggingId,            setDraggingId]            = useState<string | null>(null);
+  const [dragArmedId,           setDragArmedId]           = useState<string | null>(null);
   const [dragEnabled,           setDragEnabled]           = useState(true);
 
   const { databasesByProject, activeDatabaseId, setActiveDatabase } = useWorkspaceStore();
@@ -216,6 +235,7 @@ export default function DatabaseTabs({
   const handleToggleDrag = () => {
     setDragEnabled((v) => !v);
     setDraggingId(null);
+    setDragArmedId(null);
   };
 
   /* ── Empty state ── */
@@ -240,16 +260,17 @@ export default function DatabaseTabs({
   };
 
   const handleDropOn = (targetDbId: string) => {
-    if (!draggingId || draggingId === targetDbId) { setDraggingId(null); return; }
+    if (!draggingId || draggingId === targetDbId) { setDraggingId(null); setDragArmedId(null); return; }
     const currentIds  = orderedDbs.map((db) => db._id);
     const sourceIndex = currentIds.indexOf(draggingId);
     const targetIndex = currentIds.indexOf(targetDbId);
-    if (sourceIndex === -1 || targetIndex === -1) { setDraggingId(null); return; }
+    if (sourceIndex === -1 || targetIndex === -1) { setDraggingId(null); setDragArmedId(null); return; }
     const next = [...currentIds];
     const [moved] = next.splice(sourceIndex, 1);
     next.splice(targetIndex, 0, moved);
     setOrderedIds(next);
     setDraggingId(null);
+    setDragArmedId(null);
   };
 
   return (
@@ -263,8 +284,10 @@ export default function DatabaseTabs({
           isViewOnly={isViewOnly}
           onAddBelow={openCreateAfter}
           onDragStart={setDraggingId}
+          onArmDrag={setDragArmedId}
           onDropOn={handleDropOn}
           isDragging={draggingId === db._id}
+          isDragArmed={dragArmedId === db._id}
           dragEnabled={dragEnabled}
           onToggleDrag={handleToggleDrag}
         />

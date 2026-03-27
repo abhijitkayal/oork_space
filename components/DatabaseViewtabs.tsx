@@ -75,13 +75,13 @@ function ViewIcon({ icon, size = 13 }: { icon: string; size?: number }) {
 }
 
 /* ── Column headers ── */
-const COLUMN_HEADERS = [
-  { key:"name",     label:"Task name", icon:<Type      size={12}/> },
-  { key:"assignee", label:"Assignee",  icon:<Users     size={12}/> },
-  { key:"due",      label:"Due date",  icon:<Calendar  size={12}/> },
-  { key:"pastDue",  label:"Past due",  icon:<Calendar  size={12}/> },
-  { key:"status",   label:"Status",    icon:<CircleDot size={12}/> },
-];
+// const COLUMN_HEADERS = [
+//   { key:"name",     label:"Task name", icon:<Type      size={12}/> },
+//   { key:"assignee", label:"Assignee",  icon:<Users     size={12}/> },
+//   { key:"due",      label:"Due date",  icon:<Calendar  size={12}/> },
+//   { key:"pastDue",  label:"Past due",  icon:<Calendar  size={12}/> },
+//   { key:"status",   label:"Status",    icon:<CircleDot size={12}/> },
+// ];
 
 /* ════════════════════════════════════════════════════════════════ */
 export default function DatabaseViewTabs({
@@ -408,7 +408,7 @@ export default function DatabaseViewTabs({
       </div>
 
       {/* ══ ROW 3: Column header bar (sticky) ══════════════════ */}
-      <div className={`flex items-center gap-1 px-4 py-1.5 text-xs border-t ${
+      {/* <div className={`flex items-center gap-1 px-4 py-1.5 text-xs border-t ${
         isDark ? "border-gray-700/60 bg-transparent" : "border-gray-100 bg-gray-50/80"
       }`}>
         {COLUMN_HEADERS
@@ -428,10 +428,10 @@ export default function DatabaseViewTabs({
           <button className={`${toolBtn} w-6 h-6`} title="Add field"><Plus size={12} /></button>
           <button className={`${toolBtn} w-6 h-6`} title="More"><MoreHorizontal size={12} /></button>
         </div>
-      </div>
+      </div> */}
 
       {/* ══ ROW 4: Filter/sort chips + action buttons ══════════ */}
-      <div className={`flex items-center gap-2 px-4 py-2 border-t flex-wrap ${
+      {/* <div className={`flex items-center gap-2 px-4 py-2 border-t flex-wrap ${
         isDark ? "border-gray-700/60" : "border-gray-100"
       }`}>
         {filters.map((f) => (
@@ -484,7 +484,7 @@ export default function DatabaseViewTabs({
         }`}>
           <Plus size={11} />New task
         </button>
-      </div>
+      </div> */}
 
       {/* ══ Floating panels ════════════════════════════════════ */}
       {openPanel && (

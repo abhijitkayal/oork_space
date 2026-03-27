@@ -592,7 +592,7 @@ export default function Sidebar({ view, setView }: SidebarProps) {
         {/* ── LOGO ── */}
         {/* <div className={`${open ? "pt-5 pb-3" : "px-3 pt-4 pb-2"}`}> */}
           {/* <WorkspaceLogo open={open} isDark={isDark} /> */}
-          <div className="w-full bg-teal-50">
+          <div className={`w-full h-20 ${isDark ? "bg-[#0F1014] border-none" : "bg-teal-50 border-b border-teal-50"} pt-3 px-4 mb-4`}>
           <Image
   src={logo}
   alt="Work Space"
@@ -600,7 +600,7 @@ export default function Sidebar({ view, setView }: SidebarProps) {
   // height={100}
   className="w-40 h-25 object-contain flex items-center justify-center mx-auto -mt-4  "
 />
-<hr className="border-teal-200"/>
+{/* <hr className={`w-full`} /> */}
 </div>
         {/* </div> */}
 

@@ -8,6 +8,7 @@ import {
   Cell, ResponsiveContainer, LabelList, ReferenceLine,
 } from "recharts";
 import { Download, Upload, Plus, Trash2, RefreshCw, Link2, Database, X, FileSpreadsheet } from "lucide-react";
+import type { DbView } from "@/components/DatabaseViewtabs";
 
 // ── Types ──────────────────────────────────────────────────────────
 type ChartType = "bar" | "line" | "pie" | "area" | "scatter" | "column" | "bubble";
@@ -94,9 +95,9 @@ const CHART_TYPES: { type: ChartType; label: string; icon: string }[] = [
 
 // ── Component ──────────────────────────────────────────────────────
 export default function ChartView({
-  databaseId, projectId, templateName = "column",
+  databaseId, projectId, templateName = "column", activeView,
 }: {
-  databaseId: string; projectId?: string; templateName?: string;
+  databaseId: string; projectId?: string; templateName?: string; activeView?: DbView;
 }) {
   const initType = (Object.keys(TEMPLATE_DATA).includes(templateName) ? templateName : "column") as ChartType;
   const initData = TEMPLATE_DATA[initType];
@@ -134,7 +135,12 @@ export default function ChartView({
   const [loadedOnce, setLoadedOnce] = useState(false);
   const [csvText, setCsvText]     = useState("");
   const [activePanel, setActivePanel] = useState<"axes" | "style" | "data_info">("axes");
+  const [inputActivated, setInputActivated] = useState(false);
 
+  const modeKey = `${activeView?.type || ""} ${activeView?.label || ""}`.toLowerCase();
+  const isInputActive = modeKey.includes("input") || modeKey.includes("by-status");
+
+  const isShowData = modeKey.includes("show-data") || modeKey.includes("my-tasks");
   // ✅ FIX: track the measured pixel height of the chart wrapper so
   //    ResponsiveContainer always gets an explicit numeric height instead of
   //    "100%" — this prevents Recharts SVG from escaping its clipping rect.
@@ -499,47 +505,28 @@ export default function ChartView({
     </button>
   );
 
-  return (
-    // ✅ FIX: root div must be `overflow-hidden` so no child can paint outside it.
-    <div className="flex flex-col h-full bg-transparent text-white overflow-hidden rounded-xl">
+  if (isInputActive) {
+    return (
+      // <div className="flex flex-col h-full rounded-xl border border-gray-800 bg-[#18191d] p-4 gap-3">
+      //   <input
+      //     readOnly
+      //     value=""
+      //     placeholder="Input..."
+      //     aria-label="Input"
+      //     title="Input"
+      //     onClick={() => setInputActivated(true)}
+      //     className="w-full rounded-lg border border-gray-700 bg-[#111317] px-3 py-2 text-sm text-gray-200 placeholder:text-gray-400 outline-none"
+      //   />
 
-      {/* ══ TOP BAR ══ */}
-      <div className="flex items-center gap-2 px-3 py-2 bg-transparent border-b border-gray-800 shrink-0">
-        <input value={config.title} onChange={e => updCfg("title", e.target.value)}
-          className="flex-1 min-w-0 bg-transparent text-sm font-semibold text-white outline-none border-b border-transparent hover:border-gray-600 focus:border-blue-500 px-1 py-0.5 transition" />
+      //   {inputActivated && (
+      //     <div className="rounded-lg border border-gray-700 bg-[#111317] p-4 text-sm text-gray-200">
+      //       Input active
+      //     </div>
+      //   )}
+      // </div>
 
-        <div className="flex items-center gap-0.5 bg-gray-800 rounded-xl p-0.5 shrink-0">
-          {CHART_TYPES.map(ct => (
-            <button key={ct.type} onClick={() => switchChartType(ct.type)} title={ct.label}
-              className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold transition ${config.chartType === ct.type ? "bg-blue-600 text-white shadow" : "text-gray-400 hover:text-white"}`}>
-              <span className="text-sm">{ct.icon}</span>
-              <span className="hidden sm:inline">{ct.label}</span>
-            </button>
-          ))}
-        </div>
 
-        <div className="flex items-center gap-1 shrink-0">
-          {saving  && <span className="text-[9px] text-amber-400 animate-pulse">● Saving</span>}
-          {!saving && savedAt && <span className="text-[9px] text-emerald-400">✓ {savedAt}</span>}
-          <button onClick={exportSVG} title="Export SVG"
-            className="flex items-center gap-1 px-2 py-1.5 bg-gray-700 hover:bg-gray-600 text-gray-300 text-[11px] rounded-lg transition">
-            <Download size={11} /> SVG
-          </button>
-          <button onClick={exportCSV} title="Export CSV"
-            className="flex items-center gap-1 px-2 py-1.5 bg-gray-700 hover:bg-gray-600 text-gray-300 text-[11px] rounded-lg transition">
-            <FileSpreadsheet size={11} /> CSV
-          </button>
-        </div>
-      </div>
-
-      {/* ✅ FIX: `min-h-0` on this row prevents it from pushing flex children
-           beyond the parent's height, which is the root cause of the leaked
-           axis tick numbers appearing below the card boundary. */}
-      <div className="flex flex-1 overflow-hidden min-h-0">
-
-        {/* ══ LEFT: Data panel ══ */}
-        {/* ✅ FIX: `min-h-0` added so the inner scroll area stays within bounds */}
-        <div className="w-64 bg-gray-900 border-r border-gray-800 flex flex-col shrink-0 min-h-0">
+       <div className="w-full bg-gray-900 border-r border-gray-800 flex flex-col shrink-0 min-h-0">
           <div className="flex border-b border-gray-800 shrink-0">
             {(["manual", "import", "table"] as DataSource[]).map(t => (
               <button key={t} onClick={() => setDataTab(t)}
@@ -686,6 +673,71 @@ export default function ChartView({
             )}
           </div>
         </div>
+    );
+  }
+
+  if(isShowData){
+    return (
+      <div className="flex flex-col h-full rounded-xl border border-gray-800 bg-[#18191d] p-4 gap-3">
+        <div className="rounded-lg border border-gray-700 bg-[#111317] p-4 text-sm text-gray-200">
+          Show data...
+        </div>
+      </div>
+    );
+  }
+  return (
+    // ✅ FIX: root div must be `overflow-hidden` so no child can paint outside it.
+    <div className="flex flex-col h-full bg-transparent text-white overflow-hidden rounded-xl">
+
+      {/* ══ TOP BAR ══ */}
+      <div className="flex items-center gap-2 px-3 py-2 bg-transparent border-b border-gray-800 shrink-0">
+        <input value={config.title} onChange={e => updCfg("title", e.target.value)}
+          className="flex-1 min-w-0 bg-transparent text-sm font-semibold text-white outline-none border-b border-transparent hover:border-gray-600 focus:border-blue-500 px-1 py-0.5 transition" />
+
+        <div className="flex items-center gap-0.5 bg-gray-800 rounded-xl p-0.5 shrink-0">
+          {CHART_TYPES.map(ct => (
+            <button key={ct.type} onClick={() => switchChartType(ct.type)} title={ct.label}
+              className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold transition ${config.chartType === ct.type ? "bg-blue-600 text-white shadow" : "text-gray-400 hover:text-white"}`}>
+              <span className="text-sm">{ct.icon}</span>
+              <span className="hidden sm:inline">{ct.label}</span>
+            </button>
+          ))}
+        </div>
+
+        <div className="flex items-center gap-1 shrink-0">
+          {saving  && <span className="text-[9px] text-amber-400 animate-pulse">● Saving</span>}
+          {!saving && savedAt && <span className="text-[9px] text-emerald-400">✓ {savedAt}</span>}
+          <button onClick={exportSVG} title="Export SVG"
+            className="flex items-center gap-1 px-2 py-1.5 bg-gray-700 hover:bg-gray-600 text-gray-300 text-[11px] rounded-lg transition">
+            <Download size={11} /> SVG
+          </button>
+          <button onClick={exportCSV} title="Export CSV"
+            className="flex items-center gap-1 px-2 py-1.5 bg-gray-700 hover:bg-gray-600 text-gray-300 text-[11px] rounded-lg transition">
+            <FileSpreadsheet size={11} /> CSV
+          </button>
+        </div>
+      </div>
+
+      {/* ✅ FIX: `min-h-0` on this row prevents it from pushing flex children
+           beyond the parent's height, which is the root cause of the leaked
+           axis tick numbers appearing below the card boundary. */}
+      <div className="flex flex-1 overflow-hidden min-h-0">
+
+        {/* ══ LEFT: Data panel ══ */}
+        {/* ✅ FIX: `min-h-0` added so the inner scroll area stays within bounds */}
+        {/* <div className="w-64 bg-gray-900 border-r border-gray-800 flex flex-col shrink-0 min-h-0"> */}
+          {/* <div className="flex border-b border-gray-800 shrink-0">
+            {(["manual", "import", "table"] as DataSource[]).map(t => (
+              <button key={t} onClick={() => setDataTab(t)}
+                className={`flex-1 py-2 text-[10px] font-semibold capitalize transition border-b-2 ${dataTab === t ? "border-blue-500 text-white" : "border-transparent text-gray-500 hover:text-gray-300"}`}>
+                {t === "manual" ? "✏️ Data" : t === "import" ? "📥 Import" : "🔗 Table"}
+              </button>
+            ))}
+          </div> */}
+
+          {/* ✅ FIX: `min-h-0` here so overflow-auto actually scrolls instead of expanding */}
+          
+        {/* </div> */}
 
         {/* ══ CENTER: Chart preview ══ */}
         {/* ✅ FIX: `min-h-0` and `min-w-0` ensure this flex child doesn't

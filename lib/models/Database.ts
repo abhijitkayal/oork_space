@@ -7,7 +7,7 @@ const ViewSchema = new Schema(
     id:        { type: String, required: true },
     label:     { type: String, required: true },
     icon:      { type: String, default: "star" },
-    type:      { type: String, enum: ["all","by-status","my-tasks","custom"], default: "all" },
+    type:      { type: String, enum: ["all","by-status","my-tasks","charts","custom"], default: "all" },
     groupBy:   { type: String, default: null },
     sortBy:    { type: String, default: null },
     sortDir:   { type: String, enum: ["asc","desc"], default: "asc" },
@@ -65,13 +65,22 @@ if (process.env.NODE_ENV !== "production") {
 export default models.Database || model("Database", DatabaseSchema);
 
 export function getDefaultViews(viewType: string) {
-  if (["todo","board","table","timeline"].includes(viewType)) {
+  if (["todo","table","board","timeline"].includes(viewType)) {
     return [
-      { id:"all",       label:"All Tasks", icon:"star",   type:"all",       isDefault:true,  filters:[] },
-      { id:"by-status", label:"By Status", icon:"circle", type:"by-status", groupBy:"status",filters:[] },
-      { id:"my-tasks",  label:"My Tasks",  icon:"user",   type:"my-tasks",  filters:[{field:"assignee",op:"eq",value:"me"}] },
+      { id:"all",       label:"visualization", icon:"star",   type:"all",       isDefault:true,  filters:[] },
+      // { id:"by-status", label:"input", icon:"circle", type:"by-status", groupBy:"status",filters:[] },
+      { id:"my-tasks",  label:"show data",  icon:"user",   type:"my-tasks",  filters:[{field:"assignee",op:"eq",value:"me"}] },
     ];
   }
+    if (["chart"].includes(viewType)) {
+    return [
+      { id:"all",       label:"visualization", icon:"star",   type:"all",       isDefault:true,  filters:[] },
+      { id:"by-status", label:"input", icon:"circle", type:"by-status", groupBy:"status",filters:[] },
+      { id:"my-tasks",  label:"show data",  icon:"user",   type:"my-tasks",  filters:[{ field:"assignee",op:"eq",value:"me" }] },
+    ];
+  }
+   
+
   if (["documentation","text","pagelink"].includes(viewType)) {
     return [
       { id:"all",  label:"All Pages", icon:"star", type:"all",      isDefault:true, filters:[] },

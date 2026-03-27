@@ -11,7 +11,8 @@ export type ColumnType =
   | "checkbox"
   | "url"
   | "email"
-  | "phone";
+  | "phone"
+  | "formula";
 
 const DatabaseColumnSchema = new Schema(
   {
@@ -35,10 +36,12 @@ const DatabaseColumnSchema = new Schema(
         "url",
         "email",
         "phone",
+        "formula",
       ],
       default: "text",
     },
     order: { type: Number, default: 0 },
+    formula: { type: String, default: "" },
 
     // for select / status / multi-select
     options: [
@@ -50,6 +53,10 @@ const DatabaseColumnSchema = new Schema(
   },
   { timestamps: true }
 );
+
+// Table isolation: keep lookups scoped by table id (databaseId).
+DatabaseColumnSchema.index({ databaseId: 1, order: 1 });
+DatabaseColumnSchema.index({ databaseId: 1, name: 1 });
 
 export default models.DatabaseColumn ||
   model("DatabaseColumn", DatabaseColumnSchema);
