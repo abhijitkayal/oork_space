@@ -16,6 +16,7 @@ type TaskForm = {
   description: string;
   fromDate: string;
   toDate: string;
+  email:string;
   milestones: Milestone[];
 };
 
@@ -32,6 +33,7 @@ export default function CreateTaskModal({ isOpen, onClose, databaseId, onSaved }
     description: "",
     fromDate: "",
     toDate: "",
+    email:"",
     milestones: [],
   });
 
@@ -86,6 +88,13 @@ export default function CreateTaskModal({ isOpen, onClose, databaseId, onSaved }
         <input type="date" onChange={(e) => setForm({ ...form, fromDate: e.target.value })} />
 
         <input type="date" onChange={(e) => setForm({ ...form, toDate: e.target.value })} />
+        <input
+  type="email"
+  placeholder="Email"
+  className="border p-2 w-full mb-2"
+  value={form.email}
+  onChange={(e) => setForm({ ...form, email: e.target.value })}
+/>
 
         {form.milestones.map((m, i) => (
           <div key={i} className="border p-2 mt-2">

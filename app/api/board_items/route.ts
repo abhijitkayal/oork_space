@@ -3,7 +3,14 @@ import connectDB from "@/lib/dbConnect";
 import DatabaseItem from "@/lib/models/DatabaseItem";
 import Database from "@/lib/models/Database";
 import { getAuthUser } from "@/lib/authUser";
-
+import nodemailer from "nodemailer";
+const transporter = nodemailer.createTransport({
+  service: "gmail",
+  auth: {
+    user: "kayalabhi04@gmail.com",
+    pass:"jzdwcsrquixkekyf",
+  },
+});
 export async function GET(req: Request) {
   await connectDB();
   const authUser = await getAuthUser();
@@ -11,6 +18,31 @@ export async function GET(req: Request) {
 
   const { searchParams } = new URL(req.url);
   const databaseId = searchParams.get("databaseId");
+  const mode = searchParams.get("mode");
+
+  // Assigned mode: return tasks assigned to current user's email, including tasks from other owners.
+  if (mode === "assigned") {
+    if (!authUser.email) {
+      return NextResponse.json([], { status: 200 });
+    }
+
+    const assignedQuery: Record<string, unknown> = {
+      $or: [
+        { "values.assignee": authUser.email },
+        { "values.email": authUser.email },
+      ],
+    };
+
+    if (databaseId) {
+      assignedQuery.databaseId = databaseId;
+    }
+
+    const assignedItems = await DatabaseItem.find(assignedQuery).sort({
+      createdAt: -1,
+    });
+
+    return NextResponse.json(assignedItems);
+  }
 
   if (!databaseId) {
     return NextResponse.json([], { status: 200 });
@@ -51,6 +83,20 @@ export async function POST(req: Request) {
     databaseId,
     values: values || {},
   });
+  await transporter.sendMail({
+  from: process.env.EMAIL,
+  to: values.email, // 👈 email from your form
+  subject: "New Task Assigned",
+  html: `
+    <h2>New Task Assigned</h2>
+    <p><b>Title:</b> ${values.title}</p>
+    <p><b>Description:</b> ${values.description}</p>
+    <p><b>From:</b> ${values.fromDate}</p>
+    <p><b>To:</b> ${values.toDate}</p>
+    <p><b>Milestones:</b> ${values.milestones?.map((m: { title?: string }) => m.title || "").join(", ") || "None"}</p>
+  `,
+});
+console.log("Email sent to:", values.email);
 
   return NextResponse.json(created);
 }

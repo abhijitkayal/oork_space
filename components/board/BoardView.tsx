@@ -5,6 +5,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useTheme } from "next-themes";
 import { Calendar as CalendarIcon, MoreHorizontal, Plus } from "lucide-react";
 import type { DbView } from "@/components/DatabaseViewtabs";
+import { useAuth } from "@/components/AuthContext";
 import {
   DndContext,
   closestCorners,
@@ -66,6 +67,7 @@ interface TaskFormData {
   description: string;
   fromDate: string;
   toDate: string;
+  email:string;
   milestones: Milestone[];
 }
 
@@ -79,6 +81,8 @@ interface DatabaseBoardItem {
     milestones?: Milestone[];
     Status?: string;
     progress?: number;
+    assignee?: string;
+    email?: string;
   };
 }
 
@@ -87,6 +91,7 @@ const EMPTY_FORM: TaskFormData = {
   description: "",
   fromDate: "",
   toDate: "",
+  email:"",
   milestones: [],
 };
 
@@ -102,7 +107,7 @@ const INITIAL_COLUMNS: Column[] = [
         tags: [{ label: "To Do", color: "gray" }],
         date: "No date",
         avatars: ["bg-teal-500"],
-        assignee: "me",
+        assignee: "",
         status: "To Do",
         priority: "Medium",
         milestones: [],
@@ -184,6 +189,7 @@ function mapDatabaseItemToTask(item: DatabaseBoardItem): Task {
     status,
     priority: "Medium",
     progress,
+    assignee: values.assignee || values.email || "",
   };
 }
 
@@ -205,6 +211,7 @@ function CreateTaskModal({
   defaultStatus,
   onClose,
   onSave,
+  loggedInEmail,
 }: {
   isOpen: boolean;
   isDark: boolean;
@@ -212,6 +219,7 @@ function CreateTaskModal({
   defaultStatus: string;
   onClose: () => void;
   onSave: (form: TaskFormData) => Promise<void>;
+  loggedInEmail: string;
 }) {
   const [form, setForm] = useState<TaskFormData>(EMPTY_FORM);
 
@@ -249,7 +257,10 @@ function CreateTaskModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
       <div className={`w-full max-w-2xl rounded-2xl border p-5 ${isDark ? "border-gray-700 bg-[#151821] text-gray-100" : "border-gray-200 bg-white text-gray-900"}`}>
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-semibold">Create Task ({defaultStatus})</h2>
+          <div>
+            <h2 className="text-lg font-semibold">Create Task ({defaultStatus})</h2>
+            <p className={`text-xs ${isDark ? "text-gray-400" : "text-gray-500"}`}>Assignee: {loggedInEmail || "Not available"}</p>
+          </div>
           <button onClick={onClose} className={`rounded-md px-2 py-1 text-sm ${isDark ? "hover:bg-gray-800" : "hover:bg-gray-100"}`}>Close</button>
         </div>
 
@@ -270,6 +281,13 @@ function CreateTaskModal({
             placeholder="Description"
             className={`rounded-lg border px-3 py-2 text-sm outline-none ${isDark ? "border-gray-700 bg-[#1d2230]" : "border-gray-300 bg-white"}`}
           />
+          <input
+  type="email"
+  placeholder="Email"
+  className="border p-2 w-full mb-2"
+  value={form.email}
+  onChange={(e) => setForm((prev) => ({ ...prev, email: e.target.value }))}
+/>
           <input
             title="From date"
             aria-label="From date"
@@ -574,8 +592,8 @@ function ByStatusBoard({
   );
 }
 
-function MyTasksList({ tasks, isDark }: { tasks: Task[]; isDark: boolean }) {
-  const mine = tasks.filter((t) => t.assignee === "me");
+function MyTasksList({ tasks, isDark, loggedInEmail }: { tasks: Task[]; isDark: boolean; loggedInEmail: string }) {
+  const mine = tasks.filter((t) => t.assignee === loggedInEmail);
 
   if (mine.length === 0) {
     return (
@@ -605,6 +623,8 @@ export default function BoardView({
   activeView?: DbView;
 }) {
   const { resolvedTheme } = useTheme();
+  const { user } = useAuth();
+  const loggedInEmail = user?.email || "";
   const isDark = resolvedTheme === "dark";
 
   const [columns, setColumns] = useState<Column[]>(INITIAL_COLUMNS);
@@ -619,13 +639,18 @@ export default function BoardView({
   );
 
   const baseColumns = useMemo(() => INITIAL_COLUMNS.map((col) => ({ ...col, tasks: [] as Task[] })), []);
+  const viewType = activeView?.type || "all";
 
   const loadBoardItems = useCallback(async () => {
     if (!databaseId) return;
 
     try {
       setLoadError(null);
-      const res = await fetch(`/api/board_items?databaseId=${databaseId}`);
+      const endpoint =
+        viewType === "my-tasks"
+          ? `/api/board_items?mode=assigned`
+          : `/api/board_items?databaseId=${databaseId}`;
+      const res = await fetch(endpoint);
       if (!res.ok) throw new Error("Failed to load board items");
 
       const items: DatabaseBoardItem[] = await res.json();
@@ -644,7 +669,7 @@ export default function BoardView({
       console.error(error);
       setLoadError("Could not load board items");
     }
-  }, [baseColumns, databaseId]);
+  }, [baseColumns, databaseId, viewType]);
 
   useEffect(() => {
     if (databaseId) {
@@ -653,7 +678,6 @@ export default function BoardView({
   }, [databaseId, loadBoardItems]);
 
   const allTasks = useMemo(() => columns.flatMap((c) => c.tasks), [columns]);
-  const viewType = activeView?.type || "all";
   const getTagColor = (color: string) => getTagCls(color, isDark);
 
   const openCreateForColumn = (columnId: string) => {
@@ -667,6 +691,8 @@ export default function BoardView({
       description: form.description,
       fromDate: form.fromDate,
       toDate: form.toDate,
+      // assignee: loggedInEmail,
+      email: form.email,
       milestones: form.milestones,
       Status: createStatus,
       progress: 0,
@@ -682,6 +708,7 @@ export default function BoardView({
         });
         if (!res.ok) throw new Error("Failed to save task");
         await loadBoardItems();
+        
       } else {
         const fallbackTask: Task = {
           id: `${Date.now()}`,
@@ -694,7 +721,7 @@ export default function BoardView({
           date: formatDateRange(values.fromDate, values.toDate),
           avatars: ["bg-teal-500"],
           status: values.Status,
-          assignee: "me",
+          assignee: loggedInEmail,
           priority: "Medium",
           progress: 0,
         };
@@ -816,7 +843,7 @@ export default function BoardView({
   const colIds = useMemo(() => columns.map((c) => c.id), [columns]);
 
   if (viewType === "my-tasks") {
-    return <MyTasksList tasks={allTasks} isDark={isDark} />;
+    return <MyTasksList tasks={allTasks} isDark={isDark} loggedInEmail={loggedInEmail} />;
   }
 
   if (viewType === "by-status") {
@@ -838,6 +865,7 @@ export default function BoardView({
           defaultStatus={createStatus}
           onClose={() => setIsCreateOpen(false)}
           onSave={saveNewTask}
+          loggedInEmail={loggedInEmail}
         />
       </>
     );
@@ -874,7 +902,10 @@ export default function BoardView({
         defaultStatus={createStatus}
         onClose={() => setIsCreateOpen(false)}
         onSave={saveNewTask}
+          loggedInEmail={loggedInEmail}
       />
     </>
   );
 }
+
+
