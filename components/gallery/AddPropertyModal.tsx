@@ -113,9 +113,11 @@ export default function AddPropertyModal({
 }) {
   const [name, setName] = useState("");
   const [type, setType] = useState("text");
+  const [formula, setFormula] = useState("");
 
   const createProperty = async () => {
     if (!name.trim()) return;
+    if (type === "formula" && !formula.trim()) return;
 
     await fetch("/api/properties", {
       method: "POST",
@@ -125,11 +127,13 @@ export default function AddPropertyModal({
         name,
         type,
         options: [],
+        formula,
       }),
     });
 
     setName("");
     setType("text");
+    setFormula("");
     onSaved();
     onClose();
   };
@@ -160,13 +164,27 @@ export default function AddPropertyModal({
             <PropertyTypePicker value={type} onChange={setType} />
           </div>
 
+          {type === "formula" && (
+            <div className="space-y-2">
+              <Label>Formula</Label>
+              <Input
+                placeholder='e.g. IF(status == "Done", "✔", "Pending")'
+                value={formula}
+                onChange={(e) => setFormula(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">
+                Supported: IF(condition, trueValue, falseValue), DAYS(endDate, startDate), + - * / and comparisons.
+              </p>
+            </div>
+          )}
+
           {/* Buttons */}
           <div className="flex justify-end gap-2 pt-2">
             <Button variant="outline" onClick={onClose}>
               Cancel
             </Button>
 
-            <Button onClick={createProperty} disabled={!name.trim()}>
+            <Button onClick={createProperty} disabled={!name.trim() || (type === "formula" && !formula.trim())}>
               Create
             </Button>
           </div>

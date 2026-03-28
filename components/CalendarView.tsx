@@ -5,7 +5,8 @@ import { ChevronLeft, ChevronRight, Pencil, Plus, FileText, Check } from 'lucide
 import { useTheme } from 'next-themes';
 import BoardView from '@/components/BoardView';
 import TimelineView from '@/components/TimelineView';
-import TableView from '@/components/TableView';
+// import TableView from '@/components/TableView';
+import TableView from './gallery/TableView';
 import DashboardView from '@/components/DashboardView';
 import ActivitiesView from '@/components/ActivitiesView';
 import InboxView from '@/components/InboxView';
@@ -27,6 +28,7 @@ import {
 } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
 import { createPortal } from 'react-dom';
+// import TableView from './gallery/TableView';
 
 // --- Type Definitions for Calendar Tasks ---
 interface CalendarTask {
@@ -398,7 +400,7 @@ export default function CalendarView({ view, setView }: CalendarViewProps) {
                         ) : view === 'Timeline' ? (
                             <TimelineView databaseId="" />
                         ) : view === 'Table' ? (
-                            <TableView />
+                            <TableView databaseId="" />
                         ) : view === 'activities' ? (
                             <ActivitiesView />
                         ) : view === 'inbox' ? (

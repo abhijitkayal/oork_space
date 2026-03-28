@@ -257,8 +257,14 @@
 "use client";
 
 import { useRef, useState, useEffect } from "react";
-import { Column } from "@/app/store/TableStore";
 import FormulaSuggestions from "./FormulaSuggestions";
+
+export type FormulaProperty = {
+  _id: string;
+  name: string;
+  type: string;
+  formula?: string;
+};
 
 export type FormulaToken = {
   type: "property" | "function" | "operator" | "number" | "text";
@@ -271,7 +277,7 @@ export default function FormulaEditor({
   value,
   onChange,
 }: {
-  properties: Column[];
+  properties: FormulaProperty[];
   value: string;
   onChange: (val: string) => void;
 }) {

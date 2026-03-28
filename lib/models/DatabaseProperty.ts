@@ -46,6 +46,7 @@ const DatabasePropertySchema = new Schema(
     },
 
     options: { type: [String], default: [] },
+    formula: { type: String, default: "" },
   },
   { timestamps: true }
 );

@@ -402,8 +402,7 @@
 // }
 "use client";
 
-import { Column } from "@/app/store/TableStore";
-import { FormulaToken } from "./FormulaEditor";
+import { FormulaToken, FormulaProperty } from "./FormulaEditor";
 import { useState, useEffect, useMemo } from "react";
 
 type Suggestion = {
@@ -418,7 +417,7 @@ export default function FormulaSuggestions({
   filterText = "",
   onSelect,
 }: {
-  properties: Column[];
+  properties: FormulaProperty[];
   mode: "token" | "operator";
   filterText?: string;
   onSelect: (token: FormulaToken) => void;

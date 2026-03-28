@@ -541,8 +541,8 @@ export default function ChartView({
 
             {/* Manual data table */}
             {dataTab === "manual" && (
-              <div className="flex-1 overflow-auto min-h-0">
-                <table className="w-full text-[10px] border-collapse">
+      <div className="flex-1 min-h-0 overflow-x-auto overflow-y-auto">
+  <table className="min-w-max w-full text-[10px] border-collapse">
                   <thead>
                     <tr className="sticky top-0 bg-gray-850 z-10">
                       <th className="w-6 p-1 text-gray-600">#</th>
@@ -687,21 +687,23 @@ export default function ChartView({
   }
   return (
     // ✅ FIX: root div must be `overflow-hidden` so no child can paint outside it.
-    <div className="flex flex-col h-full bg-transparent text-white overflow-hidden rounded-xl">
+    <div className="flex flex-col h-full bg-transparent text-white overflow-y-auto rounded-xl">
 
       {/* ══ TOP BAR ══ */}
       <div className="flex items-center gap-2 px-3 py-2 bg-transparent border-b border-gray-800 shrink-0">
         <input value={config.title} onChange={e => updCfg("title", e.target.value)}
           className="flex-1 min-w-0 bg-transparent text-sm font-semibold text-white outline-none border-b border-transparent hover:border-gray-600 focus:border-blue-500 px-1 py-0.5 transition" />
 
-        <div className="flex items-center gap-0.5 bg-gray-800 rounded-xl p-0.5 shrink-0">
+        <div className="max-w-[420px] overflow-x-auto bg-gray-800 rounded-xl p-0.5 shrink-0">
+          <div className="flex items-center gap-0.5 min-w-max">
           {CHART_TYPES.map(ct => (
             <button key={ct.type} onClick={() => switchChartType(ct.type)} title={ct.label}
-              className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold transition ${config.chartType === ct.type ? "bg-blue-600 text-white shadow" : "text-gray-400 hover:text-white"}`}>
+              className={`w-[100px] shrink-0 flex items-center justify-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold transition ${config.chartType === ct.type ? "bg-blue-600 text-white shadow" : "text-gray-400 hover:text-white"}`}>
               <span className="text-sm">{ct.icon}</span>
               <span className="hidden sm:inline">{ct.label}</span>
             </button>
           ))}
+          </div>
         </div>
 
         <div className="flex items-center gap-1 shrink-0">

@@ -1,5 +1,5 @@
-import TableView from "@/components/TableView";
+import TableView from "../../../components/gallery/TableView";
 
 export default function Page() {
-  return <TableView />;
+  return <TableView databaseId=""/>;
 }

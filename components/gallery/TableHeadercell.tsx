@@ -64,19 +64,27 @@ import { useEffect, useState } from "react";
 import PropertyTypePicker from "./PropertyTypepicker";
 
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 export default function TableHeaderCell({
   property,
   refresh,
 }: {
-  property: any;
+  property: {
+    _id: string;
+    name: string;
+    type: string;
+    formula?: string;
+  };
   refresh: () => void;
 }) {
   const [name, setName] = useState(property.name);
+  const [formula, setFormula] = useState(property.formula || "");
 
   useEffect(() => {
     setName(property.name);
-  }, [property.name]);
+    setFormula(property.formula || "");
+  }, [property.name, property.formula]);
 
   const saveName = async () => {
     if (!name.trim()) {
@@ -103,6 +111,16 @@ export default function TableHeaderCell({
     refresh();
   };
 
+  const saveFormula = async () => {
+    await fetch(`/api/properties/${property._id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ formula }),
+    });
+
+    refresh();
+  };
+
   return (
     <div className="w-[220px] shrink-0 border-r px-3 py-2 bg-muted/40">
       <div className="flex items-center gap-2">
@@ -117,6 +135,20 @@ export default function TableHeaderCell({
           <PropertyTypePicker value={property.type} onChange={changeType} />
         </div>
       </div>
+
+      {property.type === "formula" && (
+        <div className="mt-2 space-y-1">
+          <Label className="text-[10px] text-muted-foreground">Formula</Label>
+          <Input
+            value={formula}
+            onChange={(e) => setFormula(e.target.value)}
+            onBlur={saveFormula}
+            placeholder='IF(status == "Done", "✔", "Pending")'
+            className="h-8 text-xs"
+            title="Formula"
+          />
+        </div>
+      )}
     </div>
   );
 }

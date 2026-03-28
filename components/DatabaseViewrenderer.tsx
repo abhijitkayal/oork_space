@@ -2,7 +2,7 @@
 
 import React from "react";
 import TimelineView from "./TimelineView";
-// import TableView from "./view/TableView";
+import TableView from "./gallery/TableView";
 import GalleryView from "./gallery/GalleryView";
 import BoardView from "./board/BoardView";
 import TodoView from "./todo/TodoView";
@@ -93,9 +93,7 @@ export default function DatabaseViewRenderer({
   }
 
   if (db.viewType === "table") {
-    return (
-      <div>it coming soon</div>
-    );
+    return withViewProps(TableView as any, id, activeViewId, activeView);
   }
 
   if (db.viewType === "gallery") {

@@ -68,6 +68,7 @@ export async function POST(req: Request) {
       name: body.name,
       type: body.type,
       options: body.options || [],
+      formula: body.formula || "",
     });
 
     console.log("✅ Created property:", created);

@@ -5,12 +5,14 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTheme } from "next-themes";
 import TimelineItemModal from "@/components/TimelineItemmodal";
+import type { DbView } from "@/components/DatabaseViewtabs";
 
 type TimelineItem = {
   _id: string;
   title: string;
   startDate: string;
   endDate: string;
+  createdAt?: string;
   assignedTo?: string;
   status?: string;
   comment?: string;
@@ -38,11 +40,12 @@ function formatMonthYear(d: Date) {
   return d.toLocaleString("en-US", { month: "long", year: "numeric" });
 }
 
-export default function TimelineView({ databaseId }: { databaseId: string }) {
+export default function TimelineView({ databaseId,activeView }: { databaseId: string,activeView?: DbView }) {
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === "dark";
 
   const router = useRouter();
+  const scrollRef = useRef<HTMLDivElement | null>(null);
   const gridRef = useRef<HTMLDivElement | null>(null);
 
   const [items, setItems] = useState<TimelineItem[]>([]);
@@ -60,6 +63,8 @@ export default function TimelineView({ databaseId }: { databaseId: string }) {
   const [draggedCardDuration, setDraggedCardDuration] = useState(0);
   const [mouseDownPos, setMouseDownPos] = useState({ x: 0, y: 0 });
   const [hasMoved, setHasMoved] = useState(false);
+    const modeKey = `${activeView?.type || ""} ${activeView?.label || ""}`.toLowerCase();
+  const isshowData = modeKey.includes("show-data") || modeKey.includes("my-tasks");
 
   const fetchItems = async () => {
     setLoading(true);
@@ -75,6 +80,7 @@ export default function TimelineView({ databaseId }: { databaseId: string }) {
         setLoading(true);
         const res = await fetch(`/api/timeline?databaseId=${databaseId}`);
         const data = await res.json();
+        console.log("timeline items", data);  
         setItems(data);
         setLoading(false);
       })();
@@ -365,12 +371,29 @@ export default function TimelineView({ databaseId }: { databaseId: string }) {
         comment: "",
       }),
     });
+    
 
     const created = await res.json();
     await fetchItems();
     setSelectedItem(created);
     setModalOpen(true);
   };
+    useEffect(() => {
+      if (loading || !scrollRef.current) return;
+
+      const container = scrollRef.current;
+
+      // Wait one frame so widths are measured after the timeline mounts.
+      const id = requestAnimationFrame(() => {
+        const scrollX = (todayOffset * DAY_COL_WIDTH) - container.clientWidth / 2;
+        container.scrollTo({
+          left: Math.max(0, scrollX),
+          behavior: "auto",
+        });
+      });
+
+      return () => cancelAnimationFrame(id);
+    }, [loading, todayOffset, DAY_COL_WIDTH, currentMonth]);
 
   const createFromNewButton = async () => {
     console.log("hi");
@@ -401,6 +424,47 @@ export default function TimelineView({ databaseId }: { databaseId: string }) {
     return (
       <div className={`p-6 text-sm ${isDark ? "text-gray-400" : "text-gray-600"}`}>
         Loading timeline...
+      </div>
+    );
+  }
+  function formatDate(date?: string | Date) {
+  if (!date) return "";
+
+  return new Date(date).toLocaleDateString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+}
+  if(isshowData){
+    return (
+      <div className={`w-full overflow-x-auto ${isDark ? "text-white" : "text-black"}`} onClick={() => console.log("show data",items)}>
+        <table className="min-w-250 w-full border border-gray-300 rounded">
+          <thead className="">
+            <tr>
+              <th className="border p-2 text-center text-blue-400">Title</th>
+              <th className="border p-2 text-center text-blue-400">Status</th>
+              <th className="border p-2 text-center text-blue-400">StartDate</th>
+              <th className="border p-2 text-center text-blue-400">EndDate</th>
+              <th className="border p-2 text-center text-blue-400">Assign</th>
+              <th className="border p-2 text-center text-blue-400">CreatedAt</th>
+            </tr>
+          </thead>
+        
+        <tbody>
+            {items.map((it) => (
+              <tr key={it._id} className="">
+                <td className="border p-2 ">{it.title}</td>
+                <td className="border p-2 ">{it.status}</td>
+                <td className="border p-2 ">{formatDate(it.startDate)}</td>
+                <td className="border p-2 ">{formatDate(it.endDate)}</td>
+                <td className="border p-2 ">{it.assignedTo||"Unassigned"}</td>
+                <td className="border p-2 ">{formatDate(it.createdAt)}</td>
+              </tr>
+            ))}
+          </tbody>  
+          </table>    
+        
       </div>
     );
   }
@@ -439,7 +503,7 @@ export default function TimelineView({ databaseId }: { databaseId: string }) {
         </div>
 
         {/* grid */}
-        <div className="relative overflow-x-auto overflow-y-hidden">
+        <div ref={scrollRef} className="relative overflow-x-auto overflow-y-hidden">
           <div style={{ minWidth: GRID_WIDTH + SIDEBAR_WIDTH }}>
             {/* Top Day Row */}
             <div className={`flex border-b ${isDark ? "border-gray-800" : "border-gray-200"}`}>
@@ -470,7 +534,7 @@ export default function TimelineView({ databaseId }: { databaseId: string }) {
                         <div
                           className={`w-7 h-7 sm:w-9 sm:h-9 flex items-center justify-center rounded-full text-xs sm:text-base ${
                             isToday
-                              ? "bg-red-500 text-white font-bold"
+                              ? "border-2 border-red-500 text-red-500 bg-transparent font-bold"
                               : isDark
                               ? "hover:bg-gray-800"
                               : "hover:bg-gray-100"

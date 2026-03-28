@@ -134,7 +134,20 @@
 import * as Popover from "@radix-ui/react-popover";
 import { useState } from "react";
 import { useTheme } from "next-themes";
-import { ColumnType } from "@/app/store/TableStore";
+
+type ColumnType =
+  | "text"
+  | "number"
+  | "select"
+  | "multi_select"
+  | "status"
+  | "date"
+  | "person"
+  | "checkbox"
+  | "url"
+  | "email"
+  | "phone"
+  | "formula";
 
 const TYPES: { type: ColumnType; label: string; icon: string }[] = [
   { type: "text", label: "Text", icon: "≡" },
@@ -174,7 +187,7 @@ export default function ColumnTypePicker({
       <Popover.Portal>
         <Popover.Content
           sideOffset={6}
-          className={`w-[320px] border rounded-xl shadow-lg p-2 z-[999] ${isDark ? "bg-[#1e1f23] border-gray-700" : "bg-white border-gray-200"}`}
+          className={`z-999 w-[320px] rounded-xl border p-2 shadow-lg ${isDark ? "border-gray-700 bg-[#1e1f23]" : "border-gray-200 bg-white"}`}
         >
           <div className={`text-xs font-semibold px-2 py-2 ${isDark ? "text-gray-400" : "text-gray-500"}`}>
             Select type

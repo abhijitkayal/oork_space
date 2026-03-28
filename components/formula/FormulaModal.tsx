@@ -1,111 +1,38 @@
-// "use client";
-
-// import { useTableStore, Column } from "@/app/store/TableStore";
-// import FormulaEditor from "./FormulaEditor";
-
-// export default function FormulaModal({ columns }: { columns: Column[] }) {
-//   const { formulaColumn, setFormulaColumn, updateColumn } = useTableStore();
-
-//   if (!formulaColumn) return null;
-
-//   return (
-//     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-//       <div className="bg-white dark:bg-[#1f1f1f] rounded-xl p-4 w-[500px]">
-//         <h2 className="text-lg font-semibold mb-3">
-//           Edit Formula: {formulaColumn.name}
-//         </h2>
-
-//         <FormulaEditor
-//           properties={columns}
-//           value={formulaColumn.formula || ""}
-//           onChange={(val) =>
-//             updateColumn(formulaColumn._id, { formula: val })
-//           }
-//         />
-
-//         <button
-//           onClick={() => setFormulaColumn(null)}
-//           className="mt-4 px-3 py-1 bg-blue-500 text-white rounded"
-//         >
-//           Close
-//         </button>
-//       </div>
-//     </div>
-//   );
-// }
-// "use client";
-
-// import { useTableStore, Column } from "@/app/store/TableStore";
-// import FormulaEditor from "./FormulaEditor";
-
-// export default function FormulaModal({ columns }: { columns: Column[] }) {
-//   const { formulaColumn, setFormulaColumn, updateColumn } = useTableStore();
-
-//   if (!formulaColumn) return null;
-
-//   return (
-//     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-//       <div className="bg-white dark:bg-[#1f1f1f] rounded-xl p-4 w-[500px]">
-//         <h2 className="text-lg font-semibold mb-3">
-//           Edit Formula: {formulaColumn.name}
-//         </h2>
-
-//         <FormulaEditor
-//           properties={columns}
-//           value={formulaColumn.formula || ""}
-//           onChange={(val) =>
-//             updateColumn(formulaColumn._id, { formula: val })
-//           }
-//         />
-
-//         <button
-//           onClick={() => setFormulaColumn(null)}
-//           className="mt-4 px-3 py-1 bg-blue-500 text-white rounded"
-//         >
-//           Close
-//         </button>
-//       </div>
-//     </div>
-//   );
-// }
-
 "use client";
 
-import { useTableStore, Column } from "@/app/store/TableStore";
-import FormulaEditor from "./FormulaEditor";
-import { useCallback } from "react";
+import FormulaEditor, { FormulaProperty } from "./FormulaEditor";
 
-export default function FormulaModal({ columns }: { columns: Column[] }) {
-  const { formulaColumn, setFormulaColumn, updateColumn } = useTableStore();
+export type FormulaModalColumn = FormulaProperty & {
+  formula?: string;
+};
 
+export default function FormulaModal({
+  columns,
+  formulaColumn,
+  onChange,
+  onClose,
+}: {
+  columns: FormulaProperty[];
+  formulaColumn: FormulaModalColumn | null;
+  onChange: (value: string) => void | Promise<void>;
+  onClose: () => void;
+}) {
   if (!formulaColumn) return null;
 
-  // Optional: prevent spamming backend on every keystroke
-  const handleFormulaChange = useCallback(
-    async (val: string) => {
-      await updateColumn(formulaColumn._id, {
-        formula: val,
-      });
-    },
-    [formulaColumn, updateColumn],
-  );
-
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-      <div className="bg-white dark:bg-[#1f1f1f] rounded-xl p-4 w-[500px]">
-        <h2 className="text-lg font-semibold mb-3">
-          Edit Formula: {formulaColumn.name}
-        </h2>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+      <div className="w-[500px] rounded-xl bg-white p-4 dark:bg-[#1f1f1f]">
+        <h2 className="mb-3 text-lg font-semibold">Edit Formula: {formulaColumn.name}</h2>
 
         <FormulaEditor
           properties={columns}
           value={formulaColumn.formula || ""}
-          onChange={handleFormulaChange}
+          onChange={onChange}
         />
 
         <button
-          onClick={() => setFormulaColumn(null)}
-          className="mt-4 px-3 py-1 bg-blue-500 text-white rounded"
+          onClick={onClose}
+          className="mt-4 rounded bg-blue-500 px-3 py-1 text-white"
         >
           Close
         </button>
