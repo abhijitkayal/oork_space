@@ -62,7 +62,7 @@ const CHART_TEMPLATE_NAMES: Record<number,string> = {
 export default function ViewPickerCard({
   projectId, insertAfterDatabaseId, onDone, isDark,
 }: {
-  projectId: string; insertAfterDatabaseId?: string | null; onDone: () => void; isDark?: boolean;
+  projectId: string; insertAfterDatabaseId?: string | null; onDone: (createdDbId?: string) => void; isDark?: boolean;
 }) {
   const [selectedCategory, setSelectedCategory] = useState<ViewType>("table");
   const [selectedTemplate, setSelectedTemplate] = useState<number | null>(null);
@@ -102,7 +102,7 @@ export default function ViewPickerCard({
       if (!res.ok) throw new Error(data?.error || `Status ${res.status}`);
       await fetchDatabases(projectId);
       if (data?._id) setActiveDatabase(data);
-      onDone();
+      onDone(data?._id);
     } catch (err) {
       console.error("Failed to create database:", err);
     } finally {
@@ -118,7 +118,7 @@ export default function ViewPickerCard({
 
         <div className={`border-b px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between ${isDark?"border-gray-800":"border-gray-200"}`}>
           <h1 className={`text-lg sm:text-2xl font-bold ${isDark?"text-white":"text-gray-900"}`}>Create a design</h1>
-          <button onClick={onDone} className={`p-2 rounded-lg transition-colors ${isDark?"hover:bg-gray-800 text-gray-400":"hover:bg-gray-100 text-gray-600"}`}>
+          <button onClick={() => onDone()} className={`p-2 rounded-lg transition-colors ${isDark?"hover:bg-gray-800 text-gray-400":"hover:bg-gray-100 text-gray-600"}`}>
             <X className="w-5 h-5"/>
           </button>
         </div>

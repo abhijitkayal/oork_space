@@ -195,8 +195,8 @@ export default function DatabaseViewTabs({
 
   /* ── Sticky wrapper bg ── */
   const stickyBg = isDark
-    ? "bg-transparent/95 border-gray-700/60"
-    : "bg-transparent/95 border-gray-200";
+    ? "bg-[#111827] border-gray-700/60"
+    : "bg-white border-gray-200";
 
   const visibleViews = views.slice(0, MAX_VISIBLE);
   const hiddenViews  = views.slice(MAX_VISIBLE);
@@ -215,7 +215,7 @@ export default function DatabaseViewTabs({
       │  z-20 keeps it above the content rows but below modals. │
       └─────────────────────────────────────────────────────────┘
     */
-    <div className={`sticky top-0 z-20 backdrop-blur-sm border-b ${stickyBg} rounded-t-xl`}>
+    <div className={`sticky top-0 z-20 border-b ${stickyBg} rounded-t-xl`}>
 
       {/* ══ ROW 1: DB icon + name ══════════════════════════════ */}
       <div className="flex items-center gap-2 px-4 pt-3 pb-2">

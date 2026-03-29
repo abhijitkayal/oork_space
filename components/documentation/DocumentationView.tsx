@@ -457,9 +457,10 @@ export default function DocumentationView({
   }[mode];
 
   return (
-    <div className="flex flex-col h-full bg-[#eef0f3] overflow-hidden font-sans">
+    <div className="flex  flex-col h-full bg-[#eef0f3] overflow-hidden font-sans">
 
       {/* ══ TITLE BAR ══ */}
+      <div className="absolute z-50 right-2">
       <div className="flex items-center gap-3 px-4 py-2.5 bg-white border-b border-gray-200/80 shrink-0 shadow-sm">
         <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-sm shrink-0">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5">
@@ -821,9 +822,10 @@ export default function DocumentationView({
           </div>
         </div>
       )}
+      </div>
 
       {/* ══ BODY ══ */}
-      <div className="flex flex-1 overflow-hidden min-h-0">
+      <div className="flex flex-1 overflow-hidden min-h-0 mt-40">
 
         {/* Document outline */}
         {showOutline && (

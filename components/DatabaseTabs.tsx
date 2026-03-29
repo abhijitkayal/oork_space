@@ -105,7 +105,7 @@ function DraggableDatabaseSection({
       onDragOver={dragEnabled  ? (e) => e.preventDefault() : undefined}
       onDrop={dragEnabled      ? () => onDropOn(db._id) : undefined}
       id={`db-section-${db._id}`}
-      className={`relative rounded-xl transition-all overflow-hidden max-h-[700px] flex flex-col ${
+      className={`relative bg-white transition-all overflow-hidden max-h-[700px] flex flex-col ${
         isDragging && dragEnabled ? "opacity-60" : ""
       }`}
     >
@@ -238,6 +238,49 @@ export default function DatabaseTabs({
     setDragArmedId(null);
   };
 
+  const openCreateAfter = (dbId: string) => {
+    setInsertAfterDatabaseId(dbId);
+    setShowCreateDbModal(true);
+  };
+
+  const getScrollParent = (element: HTMLElement): HTMLElement | null => {
+    let parent: HTMLElement | null = element.parentElement;
+    while (parent) {
+      const style = window.getComputedStyle(parent);
+      const hasScrollableY = /(auto|scroll)/.test(style.overflowY);
+      if (hasScrollableY && parent.scrollHeight > parent.clientHeight) {
+        return parent;
+      }
+      parent = parent.parentElement;
+    }
+    return document.scrollingElement as HTMLElement | null;
+  };
+
+  const scrollToDbSection = (dbId: string, attempts = 0) => {
+    const el = document.getElementById(`db-section-${dbId}`) as HTMLElement | null;
+    if (!el) {
+      if (attempts >= 40) return;
+      window.setTimeout(() => scrollToDbSection(dbId, attempts + 1), 50);
+      return;
+    }
+
+    const scrollParent = getScrollParent(el);
+    if (!scrollParent) return;
+
+    const topGap = 12;
+
+    if (scrollParent === document.scrollingElement || scrollParent === document.documentElement || scrollParent === document.body) {
+      const absoluteTop = window.scrollY + el.getBoundingClientRect().top;
+      window.scrollTo({ top: Math.max(absoluteTop - topGap, 0), behavior: "smooth" });
+      return;
+    }
+
+    const parentRect = scrollParent.getBoundingClientRect();
+    const elementRect = el.getBoundingClientRect();
+    const targetTop = scrollParent.scrollTop + (elementRect.top - parentRect.top) - topGap;
+    scrollParent.scrollTo({ top: Math.max(targetTop, 0), behavior: "smooth" });
+  };
+
   /* ── Empty state ── */
   if (dbs.length === 0) {
     return (
@@ -253,11 +296,6 @@ export default function DatabaseTabs({
       </Card>
     );
   }
-
-  const openCreateAfter = (dbId: string) => {
-    setInsertAfterDatabaseId(dbId);
-    setShowCreateDbModal(true);
-  };
 
   const handleDropOn = (targetDbId: string) => {
     if (!draggingId || draggingId === targetDbId) { setDraggingId(null); setDragArmedId(null); return; }
@@ -298,7 +336,27 @@ export default function DatabaseTabs({
           projectId={projectId}
           insertAfterDatabaseId={insertAfterDatabaseId}
           isDark={isDark}
-          onDone={() => { setShowCreateDbModal(false); setInsertAfterDatabaseId(null); }}
+          onDone={(createdDbId) => {
+            setShowCreateDbModal(false);
+
+            if (createdDbId) {
+              const afterId = insertAfterDatabaseId;
+              setOrderedIds((prev) => {
+                const current = prev.length > 0 ? prev.filter((id) => id !== createdDbId) : dbs.map((db) => db._id);
+                if (!afterId) return current.includes(createdDbId) ? current : [...current, createdDbId];
+                const afterIndex = current.indexOf(afterId);
+                if (afterIndex === -1) return current.includes(createdDbId) ? current : [...current, createdDbId];
+                const next = [...current];
+                next.splice(afterIndex + 1, 0, createdDbId);
+                return next;
+              });
+              window.requestAnimationFrame(() => {
+                window.requestAnimationFrame(() => scrollToDbSection(createdDbId));
+              });
+            }
+
+            setInsertAfterDatabaseId(null);
+          }}
         />
       )}
     </div>
